@@ -138,7 +138,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-900 text-white p-4 font-sans">
       <div className="z-10 max-w-md w-full text-center space-y-8">
         <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-cyan-500 font-display">
-          mardjan
+          coralsend
         </h1>
         <p className="text-slate-400">Secure P2P File Transfer</p>
 
