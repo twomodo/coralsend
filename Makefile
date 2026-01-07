@@ -1,4 +1,7 @@
-.PHONY: dev server web install
+.PHONY: dev server web install docker-up docker-down docker-restart docker-logs docker-build
+
+COMPOSE := docker compose
+COMPOSE_FILE := deploy/docker-compose.yml
 
 dev:
 	@echo "Starting development environment..."
@@ -14,6 +17,26 @@ web:
 
 install:
 	@echo "Installing dependencies..."
-	@cd apps/server && go mod download
+	@cd apps/server && go mod tidy
 	@cd apps/web && npm install
+
+docker-up:
+	@echo "Starting Docker Compose stack..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) up -d
+
+docker-build:
+	@echo "Building Docker images..."
+	@DOCKER_BUILDKIT=0 $(COMPOSE) -f $(COMPOSE_FILE) build
+
+docker-down:
+	@echo "Stopping Docker Compose stack..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) down
+
+docker-restart:
+	@echo "Restarting Docker Compose stack..."
+	@$(COMPOSE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) -f $(COMPOSE_FILE) up -d
+
+docker-logs:
+	@$(COMPOSE) -f $(COMPOSE_FILE) logs -f --tail=200
 
