@@ -145,9 +145,36 @@ The signaling server relays JSON messages shaped like:
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - Node.js 20+
 - (Optional) Docker & Docker Compose
+
+### Environment Variables
+
+CoralSend supports configuration via environment variables. Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
+```
+
+**Key variables:**
+
+- `NEXT_PUBLIC_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
+- `NEXT_PUBLIC_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
+
+**Example for subdirectory deployment:**
+```bash
+NEXT_PUBLIC_BASE_PATH=/coralsend
+NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
+```
+
+**Example for root deployment:**
+```bash
+# Leave NEXT_PUBLIC_BASE_PATH empty or unset
+NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
+```
+
+**Note:** For Docker builds, these variables must be passed as build args (see `deploy/docker-compose.yml`).
 
 ### Run locally
 

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/alifakhimi/coralsend/apps/server/internal/signal"
 )
@@ -37,7 +39,13 @@ func main() {
 	}))
 
 	http.HandleFunc("/health", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "CoralSend Signal Server OK")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "ok",
+			"service":   "CoralSend Signal Server",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
 	}))
 
 	fmt.Printf("CoralSend Signaling Server listening on %s\n", *addr)
