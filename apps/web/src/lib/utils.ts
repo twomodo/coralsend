@@ -1,0 +1,59 @@
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Format file size to human readable
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+// Get file icon based on mime type
+export function getFileIcon(mimeType: string): string {
+  if (mimeType.startsWith('image/')) return '🖼️';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.startsWith('audio/')) return '🎵';
+  if (mimeType.includes('pdf')) return '📄';
+  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar')) return '📦';
+  if (mimeType.includes('text') || mimeType.includes('document')) return '📝';
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return '📊';
+  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📽️';
+  return '📁';
+}
+
+// Validate UUID format
+export function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+// Extract room ID from URL or text
+export function extractRoomId(text: string): string | null {
+  // If it's a URL with room parameter
+  if (text.includes('room=')) {
+    try {
+      const url = new URL(text);
+      return url.searchParams.get('room');
+    } catch {
+      // Try regex fallback
+      const match = text.match(/room=([a-f0-9-]+)/i);
+      return match ? match[1] : null;
+    }
+  }
+  
+  // If it's a direct UUID
+  if (isValidUUID(text)) {
+    return text;
+  }
+  
+  return null;
+}
+

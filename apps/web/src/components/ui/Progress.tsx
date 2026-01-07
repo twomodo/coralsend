@@ -1,0 +1,47 @@
+'use client';
+
+import { cn } from '@/lib/utils';
+
+interface ProgressProps {
+  value: number;
+  size?: 'sm' | 'md' | 'lg';
+  showLabel?: boolean;
+  className?: string;
+}
+
+export function Progress({ value, size = 'md', showLabel = true, className }: ProgressProps) {
+  const clampedValue = Math.min(100, Math.max(0, value));
+  
+  const sizes = {
+    sm: 'h-1.5',
+    md: 'h-2.5',
+    lg: 'h-4',
+  };
+
+  return (
+    <div className={cn('w-full', className)}>
+      <div className={cn('w-full bg-slate-700/50 rounded-full overflow-hidden', sizes[size])}>
+        <div
+          className="h-full bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full transition-all duration-300 ease-out relative"
+          style={{ width: `${clampedValue}%` }}
+        >
+          {/* Animated shine effect */}
+          <div 
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]"
+            style={{ 
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 2s infinite linear',
+            }}
+          />
+        </div>
+      </div>
+      {showLabel && (
+        <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+          <span>{clampedValue}%</span>
+          {clampedValue === 100 && <span className="text-teal-400">Complete</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
