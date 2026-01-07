@@ -1,4 +1,4 @@
-module github.com/alifakhimi/mardjan/apps/server
+module github.com/alifakhimi/coralsend/apps/server
 
 go 1.24.0
 

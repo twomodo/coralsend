@@ -1,6 +1,6 @@
-# Mardjan 🪸
+# CoralSend 🪸
 
-**Mardjan** (Persian: مرجان, meaning *Coral*) is a **Zero-Knowledge, Ephemeral, P2P File Transfer** service. It allows secure file sharing between devices without storing files on a central server.
+**CoralSend** is a **Zero-Knowledge, Ephemeral, P2P File Transfer** service. It allows secure file sharing between devices without storing files on a central server.
 
 ## Philosophy
 
@@ -10,7 +10,7 @@
 
 ## Architecture
 
-Mardjan uses a **Signaling Server** (written in Go) to establish a connection between peers. Once connected, data is transferred directly using **WebRTC Data Channels**.
+CoralSend uses a **Signaling Server** (written in Go) to establish a connection between peers. Once connected, data is transferred directly using **WebRTC Data Channels**.
 
 ### Components
 
