@@ -1,0 +1,95 @@
+'use client';
+
+import { cn } from '@/lib/utils';
+import type { ConnectionStatus as Status } from '@/store/store';
+import { Wifi, WifiOff, Loader2, CheckCircle, AlertCircle, Users } from 'lucide-react';
+
+interface ConnectionStatusProps {
+  status: Status;
+  className?: string;
+}
+
+const statusConfig: Record<Status, { 
+  icon: typeof Wifi; 
+  text: string; 
+  color: string;
+  bgColor: string;
+  animate?: boolean;
+}> = {
+  idle: { 
+    icon: Wifi, 
+    text: 'Ready', 
+    color: 'text-slate-400',
+    bgColor: 'bg-slate-700/50',
+  },
+  connecting: { 
+    icon: Loader2, 
+    text: 'Connecting...', 
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10',
+    animate: true,
+  },
+  'waiting-peer': { 
+    icon: Users, 
+    text: 'Waiting for peer', 
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-500/10',
+    animate: true,
+  },
+  'peer-joined': { 
+    icon: Users, 
+    text: 'Peer joined', 
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-500/10',
+  },
+  connected: { 
+    icon: CheckCircle, 
+    text: 'Connected', 
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-500/10',
+  },
+  transferring: { 
+    icon: Loader2, 
+    text: 'Transferring', 
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-500/10',
+    animate: true,
+  },
+  completed: { 
+    icon: CheckCircle, 
+    text: 'Complete', 
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-500/10',
+  },
+  error: { 
+    icon: AlertCircle, 
+    text: 'Error', 
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/10',
+  },
+  disconnected: { 
+    icon: WifiOff, 
+    text: 'Disconnected', 
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/10',
+  },
+};
+
+export function ConnectionStatus({ status, className }: ConnectionStatusProps) {
+  const config = statusConfig[status];
+  const Icon = config.icon;
+
+  return (
+    <div 
+      className={cn(
+        'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium',
+        config.bgColor,
+        className
+      )}
+    >
+      <Icon className={cn('w-4 h-4', config.color, config.animate && 'animate-spin')} />
+      <span className={config.color}>{config.text}</span>
+    </div>
+  );
+}
+
