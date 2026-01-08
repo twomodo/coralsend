@@ -62,69 +62,84 @@ function FileItem({ file, onDownload }: FileItemProps) {
   return (
     <div
       className={cn(
-        'bg-slate-800/50 rounded-xl p-4 border transition-all',
+        'bg-slate-800/50 rounded-xl p-3 sm:p-4 border transition-all',
         isCompleted && 'border-teal-500/30',
         isDownloading && 'border-cyan-500/30',
         isError && 'border-red-500/30',
         !isCompleted && !isDownloading && !isError && 'border-slate-700/50'
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         {/* File icon or thumbnail */}
         <div className={cn(
           'flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden',
-          thumbnailUrl ? 'w-16 h-16 bg-slate-900' : 'w-12 h-12 bg-slate-700/50'
+          thumbnailUrl ? 'w-12 h-12 sm:w-16 sm:h-16 bg-slate-900' : 'w-10 h-10 sm:w-12 sm:h-12 bg-slate-700/50'
         )}>
           {thumbnailUrl ? (
             <img src={thumbnailUrl} alt={file.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="text-2xl">{getFileIcon(file.type)}</span>
+            <span className="text-xl sm:text-2xl">{getFileIcon(file.type)}</span>
           )}
         </div>
 
         {/* File info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium text-white truncate flex-1">{file.name}</h4>
-            {isCompleted && <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />}
-            {isError && <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <h4 className="font-medium text-white truncate flex-1 text-sm sm:text-base">{file.name}</h4>
+            {isCompleted && <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-400 flex-shrink-0" />}
+            {isError && <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400 flex-shrink-0" />}
           </div>
 
-          <div className="flex items-center gap-2 mt-1 text-sm text-slate-400">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-slate-400">
             <span>{formatFileSize(file.size)}</span>
-            <span>•</span>
-            <span className="truncate">{file.uploaderName}</span>
-            <span>•</span>
-            <Clock className="w-3 h-3" />
-            <span>{new Date(file.uploadedAt).toLocaleTimeString()}</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="truncate max-w-[120px] sm:max-w-none">{file.uploaderName}</span>
+            <span className="hidden sm:inline">•</span>
+            <div className="flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+              <span className="hidden sm:inline">{new Date(file.uploadedAt).toLocaleTimeString()}</span>
+              <span className="sm:hidden">{new Date(file.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
           </div>
 
           {/* Progress bar for downloading files */}
           {isDownloading && (
-            <div className="mt-3">
+            <div className="mt-2 sm:mt-3">
               <Progress value={file.progress} size="sm" />
+            </div>
+          )}
+          
+          {/* Error message */}
+          {isError && (
+            <div className="mt-1 text-xs text-red-400">
+              Download failed. Try again.
             </div>
           )}
         </div>
 
         {/* Action button */}
-        {isInbox && !isCompleted && !isDownloading && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onDownload?.(file)}
-          >
-            <Download className="w-4 h-4" />
-            Download
-          </Button>
-        )}
-        
-        {isDownloading && (
-          <div className="flex items-center gap-2 text-cyan-400 text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            {file.progress}%
-          </div>
-        )}
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          {/* Download/Retry button for inbox */}
+          {isInbox && !isDownloading && (
+            <Button
+              variant={isError ? 'secondary' : 'primary'}
+              size="sm"
+              onClick={() => onDownload?.(file)}
+              className="text-xs sm:text-sm"
+            >
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">{isError ? 'Retry' : isCompleted ? 'Download' : 'Download'}</span>
+            </Button>
+          )}
+          
+          {/* Downloading indicator */}
+          {isDownloading && (
+            <div className="flex items-center gap-1 sm:gap-2 text-cyan-400 text-xs sm:text-sm px-2 py-1">
+              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              <span>{file.progress}%</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

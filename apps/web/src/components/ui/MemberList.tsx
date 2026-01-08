@@ -4,13 +4,15 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { MemberAvatar } from './MemberAvatar';
 import { useStore } from '@/store/store';
-import { Users, Crown } from 'lucide-react';
+import { Users, Crown, RefreshCw } from 'lucide-react';
+import { Button } from './Button';
 
 interface MemberListProps {
   className?: string;
+  onRetryConnection?: (deviceId: string) => void;
 }
 
-export function MemberList({ className }: MemberListProps) {
+export function MemberList({ className, onRetryConnection }: MemberListProps) {
   const members = useStore((s) => s.currentRoom?.members);
   
   const myInfo = useMemo(() => members?.find(m => m.isMe) || null, [members]);
@@ -47,27 +49,41 @@ export function MemberList({ className }: MemberListProps) {
         {otherMembers.map((member) => (
           <div
             key={member.deviceId}
-            className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/30 transition-colors"
+            className="flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-slate-800/30 transition-colors"
           >
             <MemberAvatar member={member} size="md" />
             <div className="flex-1 min-w-0">
-              <span className="font-medium text-white truncate block">
+              <span className="font-medium text-white truncate block text-sm sm:text-base">
                 {member.displayName}
               </span>
               <p className="text-xs text-slate-500 truncate">{member.deviceId}</p>
             </div>
-            <span
-              className={cn(
-                'text-xs px-2 py-0.5 rounded-full',
-                member.status === 'online'
-                  ? 'text-teal-400 bg-teal-400/10'
-                  : member.status === 'connecting'
-                  ? 'text-yellow-400 bg-yellow-400/10'
-                  : 'text-slate-400 bg-slate-400/10'
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span
+                className={cn(
+                  'text-xs px-2 py-0.5 rounded-full whitespace-nowrap',
+                  member.status === 'online'
+                    ? 'text-teal-400 bg-teal-400/10'
+                    : member.status === 'connecting'
+                    ? 'text-yellow-400 bg-yellow-400/10'
+                    : 'text-slate-400 bg-slate-400/10'
+                )}
+              >
+                {member.status}
+              </span>
+              {/* Retry button for offline/connecting members */}
+              {member.status !== 'online' && onRetryConnection && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRetryConnection(member.deviceId)}
+                  className="p-1 sm:p-1.5 h-auto text-slate-400 hover:text-teal-400"
+                  title="Retry connection"
+                >
+                  <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </Button>
               )}
-            >
-              {member.status}
-            </span>
+            </div>
           </div>
         ))}
 

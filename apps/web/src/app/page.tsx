@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useWebRTC } from '@/hooks/useWebRTC';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/store';
 import { getDeviceId } from '@/lib/deviceId';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { HomeView } from '@/components/views/HomeView';
-import { RoomView } from '@/components/views/RoomView';
 
 // Generate room code
 function generateRoomCode(): string {
@@ -19,36 +18,41 @@ function generateRoomCode(): string {
 }
 
 export default function Home() {
-  const { connect, shareFile, requestFile, sendChat, cleanup } = useWebRTC();
-
-  // Use individual selectors to prevent unnecessary re-renders
-  const view = useStore((s) => s.view);
+  const router = useRouter();
   const deviceId = useStore((s) => s.deviceId);
 
-  // Initialize device ID on mount
+  // Initialize device ID on mount and clear any old errors
   useEffect(() => {
+    const store = useStore.getState();
     if (!deviceId) {
-      useStore.getState().setDeviceId(getDeviceId());
+      store.setDeviceId(getDeviceId());
     }
+    // Clear any previous connection errors when returning to home
+    store.setError(null);
+    store.setStatus('idle');
   }, [deviceId]);
 
-  // Handle room parameter in URL on mount
+  // Handle room parameter in URL on mount (for old links)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const roomParam = params.get('room');
 
       if (roomParam) {
-        window.history.replaceState({}, '', window.location.pathname);
-        joinRoom(roomParam);
+        // Redirect to new route format
+        const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
+        if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
+          router.replace(`/room/${roomId}`);
+        }
       }
     }
-  }, []);
+  }, [router]);
 
   // Create new room
   const createRoom = () => {
     const roomId = generateRoomCode();
-    connect(roomId, true);
+    // Navigate directly with create flag
+    router.push(`/room/${roomId}?create=true`);
   };
 
   // Join existing room
@@ -61,13 +65,8 @@ export default function Home() {
       return;
     }
 
-    connect(roomId, false);
-  };
-
-  // Leave room
-  const leaveRoom = () => {
-    cleanup();
-    useStore.getState().leaveRoom();
+    // Navigate to room route - the RoomPage will handle the connection
+    router.push(`/room/${roomId}`);
   };
 
   // Paste link from clipboard
@@ -97,22 +96,11 @@ export default function Home() {
       </div>
 
       <div className="relative z-10">
-        {view === 'home' && (
-          <HomeView
-            onCreateRoom={createRoom}
-            onJoinRoom={joinRoom}
-            onPasteLink={pasteLink}
-          />
-        )}
-
-        {view === 'room' && (
-          <RoomView
-            onLeaveRoom={leaveRoom}
-            onShareFile={shareFile}
-            onRequestFile={requestFile}
-            onSendChat={sendChat}
-          />
-        )}
+        <HomeView
+          onCreateRoom={createRoom}
+          onJoinRoom={joinRoom}
+          onPasteLink={pasteLink}
+        />
       </div>
     </main>
   );

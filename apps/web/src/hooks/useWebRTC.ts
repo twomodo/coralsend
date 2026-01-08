@@ -121,9 +121,15 @@ export const useWebRTC = () => {
     peers.current.forEach((pc) => pc.close());
     peers.current.clear();
     
-    // Close WebSocket
-    ws.current?.close();
-    ws.current = null;
+    // Close WebSocket and clear handlers to prevent state updates after cleanup
+    if (ws.current) {
+      ws.current.onclose = null;
+      ws.current.onerror = null;
+      ws.current.onmessage = null;
+      ws.current.onopen = null;
+      ws.current.close();
+      ws.current = null;
+    }
     
     incomingChunks.current.clear();
     pendingFiles.current.clear();
@@ -228,7 +234,11 @@ export const useWebRTC = () => {
 
     channel.onclose = () => {
       console.log('Data channel closed with', remoteDeviceId);
-      useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
+      const store = useStore.getState();
+      store.updateMemberStatus(remoteDeviceId, 'offline');
+      
+      // Note: Retry logic is handled in peer connection state change handlers
+      // This ensures we don't have circular dependencies
     };
 
     channel.onerror = (error) => {
@@ -242,9 +252,33 @@ export const useWebRTC = () => {
 
   // ============ Peer Connection ============
 
+  // Clean up peer connection
+  const cleanupPeerConnection = useCallback((remoteDeviceId: string) => {
+    const pc = peers.current.get(remoteDeviceId);
+    if (pc) {
+      console.log('Cleaning up peer connection with', remoteDeviceId);
+      pc.close();
+      peers.current.delete(remoteDeviceId);
+    }
+    dataChannels.current.delete(remoteDeviceId);
+  }, []);
+
+
   const createPeerConnection = useCallback((remoteDeviceId: string, isInitiator: boolean) => {
-    if (peers.current.has(remoteDeviceId)) {
-      return peers.current.get(remoteDeviceId)!;
+    // Clean up old connection if exists and is in bad state
+    const existingPc = peers.current.get(remoteDeviceId);
+    if (existingPc) {
+      const state = existingPc.connectionState;
+      const iceState = existingPc.iceConnectionState;
+      if (state === 'closed' || state === 'failed' || iceState === 'closed' || iceState === 'failed') {
+        console.log('Cleaning up old failed connection with', remoteDeviceId);
+        existingPc.close();
+        peers.current.delete(remoteDeviceId);
+        dataChannels.current.delete(remoteDeviceId);
+      } else {
+        // Connection still exists and is valid
+        return existingPc;
+      }
     }
 
     console.log('Creating peer connection with', remoteDeviceId, isInitiator ? '(initiator)' : '(receiver)');
@@ -270,7 +304,54 @@ export const useWebRTC = () => {
       if (state === 'connected' || state === 'completed') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-        useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
+        const store = useStore.getState();
+        store.updateMemberStatus(remoteDeviceId, 'offline');
+        
+        // Clean up failed connection
+        if (state === 'failed' || state === 'closed') {
+          cleanupPeerConnection(remoteDeviceId);
+          
+          // Retry after a delay
+          setTimeout(async () => {
+            const retryStore = useStore.getState();
+            const myDeviceId = retryStore.deviceId;
+            const room = retryStore.currentRoom;
+            
+            if (!myDeviceId || !room) return;
+            
+            // Check if member still exists in room
+            const member = room.members.find(m => m.deviceId === remoteDeviceId);
+            if (!member || member.deviceId === myDeviceId) return;
+            
+            // Don't retry if already connected
+            const existingPc = peers.current.get(remoteDeviceId);
+            if (existingPc && (existingPc.connectionState === 'connected' || existingPc.iceConnectionState === 'connected' || existingPc.iceConnectionState === 'completed')) {
+              return;
+            }
+            
+            console.log('Retrying ICE connection with', member.displayName);
+            retryStore.updateMemberStatus(remoteDeviceId, 'connecting');
+            
+            // Initiate connection (higher deviceId initiates)
+            if (myDeviceId > remoteDeviceId) {
+              try {
+                const newPc = createPeerConnection(remoteDeviceId, true);
+                const offer = await newPc.createOffer();
+                await newPc.setLocalDescription(offer);
+                
+                ws.current?.send(JSON.stringify({
+                  type: 'offer',
+                  roomId: room.id,
+                  targetId: remoteDeviceId,
+                  payload: offer,
+                }));
+              } catch (err) {
+                console.error('Failed to retry ICE connection:', err);
+                retryStore.updateMemberStatus(remoteDeviceId, 'offline');
+              }
+            }
+          }, 3000); // Retry after 3 seconds
+        }
       }
     };
 
@@ -281,7 +362,54 @@ export const useWebRTC = () => {
       if (state === 'connected') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-        useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
+        const store = useStore.getState();
+        store.updateMemberStatus(remoteDeviceId, 'offline');
+        
+        // Clean up failed connection
+        if (state === 'failed' || state === 'closed') {
+          cleanupPeerConnection(remoteDeviceId);
+          
+          // Retry after a delay
+          setTimeout(async () => {
+            const retryStore = useStore.getState();
+            const myDeviceId = retryStore.deviceId;
+            const room = retryStore.currentRoom;
+            
+            if (!myDeviceId || !room) return;
+            
+            // Check if member still exists in room
+            const member = room.members.find(m => m.deviceId === remoteDeviceId);
+            if (!member || member.deviceId === myDeviceId) return;
+            
+            // Don't retry if already connected
+            const existingPc = peers.current.get(remoteDeviceId);
+            if (existingPc && (existingPc.connectionState === 'connected' || existingPc.iceConnectionState === 'connected' || existingPc.iceConnectionState === 'completed')) {
+              return;
+            }
+            
+            console.log('Retrying connection with', member.displayName);
+            retryStore.updateMemberStatus(remoteDeviceId, 'connecting');
+            
+            // Initiate connection (higher deviceId initiates)
+            if (myDeviceId > remoteDeviceId) {
+              try {
+                const newPc = createPeerConnection(remoteDeviceId, true);
+                const offer = await newPc.createOffer();
+                await newPc.setLocalDescription(offer);
+                
+                ws.current?.send(JSON.stringify({
+                  type: 'offer',
+                  roomId: room.id,
+                  targetId: remoteDeviceId,
+                  payload: offer,
+                }));
+              } catch (err) {
+                console.error('Failed to retry connection:', err);
+                retryStore.updateMemberStatus(remoteDeviceId, 'offline');
+              }
+            }
+          }, 3000); // Retry after 3 seconds
+        }
       }
     };
 
@@ -298,7 +426,7 @@ export const useWebRTC = () => {
     }
 
     return pc;
-  }, [setupDataChannel]);
+  }, [setupDataChannel, cleanupPeerConnection]);
 
   // ============ Signaling ============
 
@@ -316,12 +444,22 @@ export const useWebRTC = () => {
           const members = msg.payload as MemberPayload[];
           for (const m of members) {
             if (m.deviceId !== myDeviceId) {
-              store.addMember({
-                deviceId: m.deviceId,
-                displayName: m.displayName,
-                joinedAt: m.joinedAt,
-                status: 'connecting' as const,
-              });
+              // Check if member already exists
+              const existingMember = store.currentRoom?.members.find(member => member.deviceId === m.deviceId);
+              
+              if (!existingMember) {
+                // New member - add to list
+                store.addMember({
+                  deviceId: m.deviceId,
+                  displayName: m.displayName,
+                  joinedAt: m.joinedAt,
+                  status: 'connecting' as const,
+                });
+              } else if (existingMember.status === 'offline') {
+                // Member was offline - retry connection
+                console.log('Retrying connection with offline member', m.displayName);
+                store.updateMemberStatus(m.deviceId, 'connecting');
+              }
 
               // Set timeout to check connection status
               setTimeout(() => {
@@ -332,21 +470,30 @@ export const useWebRTC = () => {
                 }
               }, 30000); // 30 seconds timeout
 
-              // Initiate connection with existing members (higher deviceId initiates)
-              if (myDeviceId > m.deviceId) {
-                console.log('Initiating connection with existing member', m.displayName, '(I am initiator)');
-                const pc = createPeerConnection(m.deviceId, true);
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                
-                ws.current?.send(JSON.stringify({
-                  type: 'offer',
-                  roomId,
-                  targetId: m.deviceId,
-                  payload: offer,
-                }));
-              } else {
-                console.log('Waiting for offer from existing member', m.displayName, '(they are initiator)');
+              // Check if we need to initiate connection
+              const pc = peers.current.get(m.deviceId);
+              const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' || 
+                                    pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
+              
+              if (shouldInitiate && myDeviceId > m.deviceId) {
+                console.log('Initiating connection with member', m.displayName, '(I am initiator)');
+                try {
+                  const newPc = createPeerConnection(m.deviceId, true);
+                  const offer = await newPc.createOffer();
+                  await newPc.setLocalDescription(offer);
+                  
+                  ws.current?.send(JSON.stringify({
+                    type: 'offer',
+                    roomId,
+                    targetId: m.deviceId,
+                    payload: offer,
+                  }));
+                } catch (err) {
+                  console.error('Failed to initiate connection:', err);
+                  store.updateMemberStatus(m.deviceId, 'offline');
+                }
+              } else if (shouldInitiate) {
+                console.log('Waiting for offer from member', m.displayName, '(they are initiator)');
               }
             }
           }
@@ -357,38 +504,56 @@ export const useWebRTC = () => {
         case 'member-joined': {
           const member = msg.payload as MemberPayload;
           if (member.deviceId !== myDeviceId) {
-            console.log('Member joined:', member.displayName);
-            store.addMember({
-              deviceId: member.deviceId,
-              displayName: member.displayName,
-              joinedAt: member.joinedAt,
-              status: 'connecting' as const,
-            });
+            // Check if member already exists
+            const existingMember = store.currentRoom?.members.find(m => m.deviceId === member.deviceId);
+            
+            if (!existingMember) {
+              // New member - add to list
+              console.log('Member joined:', member.displayName);
+              store.addMember({
+                deviceId: member.deviceId,
+                displayName: member.displayName,
+                joinedAt: member.joinedAt,
+                status: 'connecting' as const,
+              });
+            } else if (existingMember.status === 'offline') {
+              // Member was offline - retry connection
+              console.log('Retrying connection with offline member', member.displayName);
+              store.updateMemberStatus(member.deviceId, 'connecting');
+            }
 
             // Set timeout to check connection status
             setTimeout(() => {
               const currentMember = useStore.getState().currentRoom?.members.find(m => m.deviceId === member.deviceId);
               if (currentMember && currentMember.status === 'connecting') {
-                console.warn('Connection timeout for', member.displayName, '- retrying...');
-                // Mark as offline after timeout
+                console.warn('Connection timeout for', member.displayName, '- marking as offline');
                 useStore.getState().updateMemberStatus(member.deviceId, 'offline');
               }
             }, 30000); // 30 seconds timeout
 
-            // Initiate connection (higher deviceId initiates)
-            if (myDeviceId > member.deviceId) {
+            // Check if we need to initiate connection
+            const pc = peers.current.get(member.deviceId);
+            const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' || 
+                                  pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
+            
+            if (shouldInitiate && myDeviceId > member.deviceId) {
               console.log('Initiating connection with', member.displayName, '(I am initiator)');
-              const pc = createPeerConnection(member.deviceId, true);
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              
-              ws.current?.send(JSON.stringify({
-                type: 'offer',
-                roomId,
-                targetId: member.deviceId,
-                payload: offer,
-              }));
-            } else {
+              try {
+                const newPc = createPeerConnection(member.deviceId, true);
+                const offer = await newPc.createOffer();
+                await newPc.setLocalDescription(offer);
+                
+                ws.current?.send(JSON.stringify({
+                  type: 'offer',
+                  roomId,
+                  targetId: member.deviceId,
+                  payload: offer,
+                }));
+              } catch (err) {
+                console.error('Failed to initiate connection:', err);
+                store.updateMemberStatus(member.deviceId, 'offline');
+              }
+            } else if (shouldInitiate) {
               console.log('Waiting for offer from', member.displayName, '(they are initiator)');
             }
           }
@@ -750,6 +915,51 @@ export const useWebRTC = () => {
     return () => cleanup();
   }, [cleanup]);
 
+  // ============ Retry Connection ============
+  
+  const retryConnection = useCallback((remoteDeviceId: string) => {
+    console.log('Manual retry connection with', remoteDeviceId);
+    const store = useStore.getState();
+    
+    // Clean up existing connection
+    cleanupPeerConnection(remoteDeviceId);
+    
+    // Update status to connecting
+    store.updateMemberStatus(remoteDeviceId, 'connecting');
+    
+    // Create new peer connection
+    const myDeviceId = store.deviceId;
+    if (!myDeviceId) {
+      console.error('Cannot retry: no device ID');
+      return;
+    }
+    
+    // Determine if we should be initiator (alphabetically lower device ID initiates)
+    const isInitiator = myDeviceId < remoteDeviceId;
+    
+    const pc = createPeerConnection(remoteDeviceId, isInitiator);
+    
+    if (isInitiator) {
+      // Create offer
+      pc.createOffer()
+        .then((offer) => pc.setLocalDescription(offer))
+        .then(() => {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({
+              type: 'offer',
+              roomId: store.currentRoom?.id,
+              targetId: remoteDeviceId,
+              payload: pc.localDescription,
+            }));
+          }
+        })
+        .catch((err) => {
+          console.error('Error creating offer for retry:', err);
+          store.updateMemberStatus(remoteDeviceId, 'offline');
+        });
+    }
+  }, [cleanupPeerConnection, createPeerConnection]);
+
   // ============ Return ============
 
   return {
@@ -758,5 +968,6 @@ export const useWebRTC = () => {
     requestFile,
     sendChat,
     cleanup,
+    retryConnection,
   };
 };
