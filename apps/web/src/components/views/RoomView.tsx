@@ -32,9 +32,10 @@ interface RoomViewProps {
   onShareFile: (file: File) => void;
   onRequestFile: (file: any) => void;
   onSendChat: (message: string) => void;
+  onRetryConnection?: (deviceId: string) => void;
 }
 
-export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat }: RoomViewProps) {
+export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, onRetryConnection }: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -45,12 +46,12 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat }
 
   if (!currentRoom) return null;
 
-  const shareUrl = `${getBaseUrl()}?room=${currentRoom.id}`;
+  const shareUrl = `${getBaseUrl()}/room/${currentRoom.id}`;
 
   // Copy share link
   const copyLink = async () => {
     try {
-      const link = `${getBaseUrl()}?room=${currentRoom.id}`;
+      const link = `${getBaseUrl()}/room/${currentRoom.id}`;
       await navigator.clipboard.writeText(link);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -144,7 +145,7 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat }
 
           {/* Member list */}
           <Card variant="bordered">
-            <MemberList />
+            <MemberList onRetryConnection={onRetryConnection} />
           </Card>
 
           {/* Tab navigation */}
