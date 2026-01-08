@@ -1,7 +1,7 @@
-// Get base URL (origin + pathname) dynamically
+// Get base URL (origin only)
 export const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
-    return window.location.origin + window.location.pathname.replace(/\/$/, '');
+    return window.location.origin;
   }
   return '';
 };
