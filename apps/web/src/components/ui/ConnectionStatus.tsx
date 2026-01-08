@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import type { ConnectionStatus as Status } from '@/store/store';
-import { Wifi, WifiOff, Loader2, CheckCircle, AlertCircle, Users } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ConnectionStatusProps {
   status: Status;
@@ -29,35 +29,9 @@ const statusConfig: Record<Status, {
     bgColor: 'bg-yellow-500/10',
     animate: true,
   },
-  'waiting-peer': { 
-    icon: Users, 
-    text: 'Waiting for peer', 
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/10',
-    animate: true,
-  },
-  'peer-joined': { 
-    icon: Users, 
-    text: 'Peer joined', 
-    color: 'text-teal-400',
-    bgColor: 'bg-teal-500/10',
-  },
   connected: { 
     icon: CheckCircle, 
     text: 'Connected', 
-    color: 'text-teal-400',
-    bgColor: 'bg-teal-500/10',
-  },
-  transferring: { 
-    icon: Loader2, 
-    text: 'Transferring', 
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/10',
-    animate: true,
-  },
-  completed: { 
-    icon: CheckCircle, 
-    text: 'Complete', 
     color: 'text-teal-400',
     bgColor: 'bg-teal-500/10',
   },

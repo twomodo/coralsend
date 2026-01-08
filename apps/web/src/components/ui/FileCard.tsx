@@ -2,16 +2,26 @@
 
 import { cn, formatFileSize, getFileIcon } from '@/lib/utils';
 import { Progress } from './Progress';
-import { CheckCircle, AlertCircle, X, FileIcon } from 'lucide-react';
-import type { FileTransfer } from '@/store/store';
+import { CheckCircle, AlertCircle, X } from 'lucide-react';
+import type { FileMetadata } from '@/store/store';
 
 interface FileCardProps {
-  file: FileTransfer;
+  file: FileMetadata;
   onRemove?: () => void;
   className?: string;
 }
 
 export function FileCard({ file, onRemove, className }: FileCardProps) {
+  // Map FileMetadata status to FileCard status
+  const getCardStatus = () => {
+    if (file.status === 'downloading') return 'transferring';
+    if (file.status === 'completed') return 'completed';
+    if (file.status === 'error') return 'error';
+    return 'pending';
+  };
+
+  const cardStatus = getCardStatus();
+
   const statusColors = {
     pending: 'border-slate-600',
     transferring: 'border-cyan-500/50',
@@ -26,11 +36,14 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
     error: <AlertCircle className="w-5 h-5 text-red-400" />,
   };
 
+  // Map direction
+  const directionLabel = file.direction === 'inbox' ? 'Receiving' : 'Sending';
+
   return (
     <div
       className={cn(
         'bg-slate-800/60 rounded-xl p-4 border transition-colors',
-        statusColors[file.status],
+        statusColors[cardStatus],
         className
       )}
     >
@@ -44,8 +57,8 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-white truncate flex-1">{file.name}</h4>
-            {statusIcons[file.status]}
-            {onRemove && file.status !== 'transferring' && (
+            {statusIcons[cardStatus]}
+            {onRemove && cardStatus !== 'transferring' && (
               <button
                 onClick={onRemove}
                 className="p-1 hover:bg-slate-700 rounded transition-colors"
@@ -59,12 +72,12 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
             {formatFileSize(file.size)}
             <span className="mx-2">•</span>
             <span className="capitalize">
-              {file.direction === 'send' ? 'Sending' : 'Receiving'}
+              {directionLabel}
             </span>
           </p>
 
           {/* Progress bar for active transfers */}
-          {(file.status === 'transferring' || file.status === 'pending') && (
+          {(cardStatus === 'transferring' || cardStatus === 'pending') && (
             <div className="mt-3">
               <Progress value={file.progress} size="sm" />
             </div>
