@@ -34,6 +34,7 @@ import {
   Inbox,
   Send,
   Settings,
+  User,
 } from 'lucide-react';
 
 // Generate room code
@@ -195,12 +196,19 @@ export default function Home() {
           <>
             {/* Header */}
             <header className="p-4 sm:p-6">
-              <div className="max-w-lg mx-auto flex items-center justify-between">
-                <Logo size="sm" />
+              <div className="max-w-lg mx-auto flex items-center justify-end">
                 {deviceId && (
-                  <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded">
-                    {getShortName(deviceId)}
-                  </span>
+                  <div className="flex items-center gap-3 bg-slate-800/40 border border-slate-700/50 rounded-full py-1.5 pl-3 pr-4">
+                    <div className="flex flex-col items-start leading-tight">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">My Device</span>
+                      <span className="text-sm font-semibold text-slate-200">
+                        {getShortName(deviceId)}
+                      </span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
+                      <User className="w-4 h-4 text-teal-400" />
+                    </div>
+                  </div>
                 )}
               </div>
             </header>

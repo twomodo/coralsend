@@ -23,16 +23,10 @@ export function Logo({ size = 'md', showText = true, className }: LogoProps) {
         className="relative"
         style={{ width: icon, height: icon }}
       >
-        {/* Animated glow effect */}
-        <div 
-          className="absolute inset-0 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full blur-md opacity-50 animate-pulse"
-          style={{ animationDuration: '3s' }}
-        />
-        
         {/* Logo SVG inline for animation control */}
         <svg 
           viewBox="0 0 200 200" 
-          className="relative w-full h-full drop-shadow-lg"
+          className="relative w-full h-full"
         >
           <defs>
             <linearGradient id="coralGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -46,7 +40,7 @@ export function Logo({ size = 'md', showText = true, className }: LogoProps) {
           </defs>
           
           {/* Center node */}
-          <circle cx="100" cy="100" r="16" fill="url(#coralGrad)" className="drop-shadow-md" />
+          <circle cx="100" cy="100" r="16" fill="url(#coralGrad)" />
           
           {/* Branches with subtle animation */}
           <g className="animate-[pulse_4s_ease-in-out_infinite]">
