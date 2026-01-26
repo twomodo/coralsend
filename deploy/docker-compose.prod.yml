@@ -1,0 +1,38 @@
+services:
+  # server:
+  #   image: registry.sikapp.ir/nginx:1.27.4
+  #   build:
+  #     context: ../
+  #     dockerfile: deploy/Dockerfile.server
+  #   ports:
+  #     - "8080:8080"
+  #   restart: always
+
+  web:
+    # image: registry.sikapp.ir/node:22.13.1-bullseye
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.node
+      args:
+        - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
+        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
+      - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+    # depends_on:
+    #   - server
+    restart: unless-stopped
+
+  nginx:
+    image: registry.sikapp.ir/nginx:1.27.4
+    restart: unless-stopped
+    volumes:
+      - ../conf.d:/etc/nginx/conf.d
+    ports:
+      - 80:80
+      # - 443:443
+    depends_on:
+      - web
+      # - server

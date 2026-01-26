@@ -152,22 +152,20 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
           <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
             <button
               onClick={() => setActiveTab('inbox')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'inbox'
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'inbox'
                   ? 'bg-slate-700 text-white'
                   : 'text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               <Inbox className="w-4 h-4" />
               Inbox
             </button>
             <button
               onClick={() => setActiveTab('outbox')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'outbox'
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'outbox'
                   ? 'bg-slate-700 text-white'
                   : 'text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               <Send className="w-4 h-4" />
               Outbox
@@ -175,8 +173,22 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
           </div>
 
           {/* File list */}
-          <Card variant="bordered">
-            <FileList direction={activeTab} onDownload={onRequestFile} />
+          <Card variant="bordered" className="flex flex-col overflow-hidden">
+            {activeTab === 'outbox' && (
+              <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/30">
+                <span className="text-sm font-medium text-slate-400">Your Shared Files</span>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300 transition-colors px-2 py-1 rounded-md hover:bg-teal-400/10"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add File
+                </button>
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <FileList direction={activeTab} onDownload={onRequestFile} />
+            </div>
           </Card>
 
           {/* Chat */}
@@ -184,22 +196,14 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
         </div>
       </div>
 
-      {/* Floating action button */}
-      <div className="fixed bottom-6 right-6">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="w-14 h-14 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full shadow-lg shadow-teal-500/25 flex items-center justify-center hover:scale-110 transition-transform"
-        >
-          <Plus className="w-7 h-7 text-white" />
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-      </div>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
+      />
 
       {/* Drop zone overlay */}
       {isDragOver && (

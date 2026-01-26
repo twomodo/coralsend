@@ -6,10 +6,11 @@ node_modules
 .DS_Store
 apps/web/.next
 apps/web/node_modules
-apps/web/.env*
+# apps/web/.env*
 apps/server/server
 apps/server/*.test.go
 *.log
 .cursor
 plans
+deploy/docker-containers
 

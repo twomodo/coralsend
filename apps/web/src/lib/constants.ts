@@ -10,12 +10,13 @@ export const getBaseUrl = (): string => {
 export const getSignalingServerUrl = (): string => {
   // Use environment variable if set (highest priority)
   // Check both at build time and runtime
-  const envUrl = process.env.NEXT_PUBLIC_SIGNALING_URL;
-  if (envUrl) {
-    // Return as-is, don't modify it
-    console.log('Using NEXT_PUBLIC_SIGNALING_URL from env:', envUrl);
-    return envUrl;
-  }
+  // const envUrl = process.env.NEXT_PUBLIC_SIGNALING_URL;
+  // const envUrl = "wss://coralsend.fakhimi.ir/ws";
+  // if (envUrl) {
+  //   // Return as-is, don't modify it
+  //   console.log('Using NEXT_PUBLIC_SIGNALING_URL from env:', envUrl);
+  //   return envUrl;
+  // }
 
   console.log('NEXT_PUBLIC_SIGNALING_URL not set, building URL dynamically');
 
@@ -33,7 +34,7 @@ export const getSignalingServerUrl = (): string => {
     // Option 1: Same hostname, different port (if server is on 8080)
     // Option 2: Use subdomain like ws.example.com
     // For now, we'll try same hostname with port 8080
-    const port = window.location.port ? `:8080` : ':8080';
+    const port = window.location.port ?? ':8080';
     return `${protocol}//${hostname}${port}/ws`;
   }
 

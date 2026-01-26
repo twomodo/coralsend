@@ -52,7 +52,7 @@ const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
  */
 async function generateThumbnail(file: File): Promise<string | undefined> {
   if (!file.type.startsWith('image/')) return undefined;
-  
+
   try {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -62,7 +62,7 @@ async function generateThumbnail(file: File): Promise<string | undefined> {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          
+
           // Scale down to max thumbnail size
           if (width > height) {
             if (width > THUMBNAIL_MAX_SIZE) {
@@ -75,12 +75,12 @@ async function generateThumbnail(file: File): Promise<string | undefined> {
               height = THUMBNAIL_MAX_SIZE;
             }
           }
-          
+
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          
+
           resolve(canvas.toDataURL('image/jpeg', 0.7));
         };
         img.onerror = () => resolve(undefined);
@@ -98,11 +98,11 @@ async function generateThumbnail(file: File): Promise<string | undefined> {
 
 export const useWebRTC = () => {
   const ws = useRef<WebSocket | null>(null);
-  
+
   // Multi-peer connections: deviceId -> RTCPeerConnection
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
-  
+
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
   const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
@@ -112,15 +112,15 @@ export const useWebRTC = () => {
 
   const cleanup = useCallback(() => {
     sendAbortController.current?.abort();
-    
+
     // Close all data channels
     dataChannels.current.forEach((dc) => dc.close());
     dataChannels.current.clear();
-    
+
     // Close all peer connections
     peers.current.forEach((pc) => pc.close());
     peers.current.clear();
-    
+
     // Close WebSocket and clear handlers to prevent state updates after cleanup
     if (ws.current) {
       ws.current.onclose = null;
@@ -130,10 +130,10 @@ export const useWebRTC = () => {
       ws.current.close();
       ws.current = null;
     }
-    
+
     incomingChunks.current.clear();
     pendingFiles.current.clear();
-    
+
     useStore.getState().reset();
   }, []);
 
@@ -160,12 +160,12 @@ export const useWebRTC = () => {
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
-        
+
         if (msg.type === 'file-start') {
           // Receiving file data start
           const meta = msg.payload as FileMetadataPayload;
           console.log('Receiving file from', senderDeviceId, ':', meta.name);
-          
+
           // Ensure file exists in store (in case file-meta was missed)
           const existingFile = store.currentRoom?.files.find(f => f.id === meta.id);
           if (!existingFile) {
@@ -180,16 +180,16 @@ export const useWebRTC = () => {
               thumbnailUrl: meta.thumbnailUrl,
             }, meta.id);
           }
-          
+
           incomingChunks.current.set(meta.id, { meta, chunks: [] });
           store.updateFileStatus(meta.id, 'downloading');
           store.updateFileProgress(meta.id, 0);
-          
+
         } else if (msg.type === 'file-end') {
           // File transfer complete
           const fileId = msg.fileId;
           const incoming = incomingChunks.current.get(fileId);
-          
+
           if (incoming) {
             console.log('File transfer complete:', incoming.meta.name);
             store.updateFileStatus(fileId, 'completed');
@@ -210,7 +210,7 @@ export const useWebRTC = () => {
       const fileIdBytes = data.slice(0, 36);
       const fileId = decoder.decode(fileIdBytes).trim();
       const chunk = data.slice(36);
-      
+
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
         incoming.chunks.push(chunk);
@@ -236,7 +236,7 @@ export const useWebRTC = () => {
       console.log('Data channel closed with', remoteDeviceId);
       const store = useStore.getState();
       store.updateMemberStatus(remoteDeviceId, 'offline');
-      
+
       // Note: Retry logic is handled in peer connection state change handlers
       // This ensures we don't have circular dependencies
     };
@@ -282,7 +282,7 @@ export const useWebRTC = () => {
     }
 
     console.log('Creating peer connection with', remoteDeviceId, isInitiator ? '(initiator)' : '(receiver)');
-    
+
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peers.current.set(remoteDeviceId, pc);
 
@@ -306,39 +306,39 @@ export const useWebRTC = () => {
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         const store = useStore.getState();
         store.updateMemberStatus(remoteDeviceId, 'offline');
-        
+
         // Clean up failed connection
         if (state === 'failed' || state === 'closed') {
           cleanupPeerConnection(remoteDeviceId);
-          
+
           // Retry after a delay
           setTimeout(async () => {
             const retryStore = useStore.getState();
             const myDeviceId = retryStore.deviceId;
             const room = retryStore.currentRoom;
-            
+
             if (!myDeviceId || !room) return;
-            
+
             // Check if member still exists in room
             const member = room.members.find(m => m.deviceId === remoteDeviceId);
             if (!member || member.deviceId === myDeviceId) return;
-            
+
             // Don't retry if already connected
             const existingPc = peers.current.get(remoteDeviceId);
             if (existingPc && (existingPc.connectionState === 'connected' || existingPc.iceConnectionState === 'connected' || existingPc.iceConnectionState === 'completed')) {
               return;
             }
-            
+
             console.log('Retrying ICE connection with', member.displayName);
             retryStore.updateMemberStatus(remoteDeviceId, 'connecting');
-            
+
             // Initiate connection (higher deviceId initiates)
             if (myDeviceId > remoteDeviceId) {
               try {
                 const newPc = createPeerConnection(remoteDeviceId, true);
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
-                
+
                 ws.current?.send(JSON.stringify({
                   type: 'offer',
                   roomId: room.id,
@@ -364,39 +364,39 @@ export const useWebRTC = () => {
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         const store = useStore.getState();
         store.updateMemberStatus(remoteDeviceId, 'offline');
-        
+
         // Clean up failed connection
         if (state === 'failed' || state === 'closed') {
           cleanupPeerConnection(remoteDeviceId);
-          
+
           // Retry after a delay
           setTimeout(async () => {
             const retryStore = useStore.getState();
             const myDeviceId = retryStore.deviceId;
             const room = retryStore.currentRoom;
-            
+
             if (!myDeviceId || !room) return;
-            
+
             // Check if member still exists in room
             const member = room.members.find(m => m.deviceId === remoteDeviceId);
             if (!member || member.deviceId === myDeviceId) return;
-            
+
             // Don't retry if already connected
             const existingPc = peers.current.get(remoteDeviceId);
             if (existingPc && (existingPc.connectionState === 'connected' || existingPc.iceConnectionState === 'connected' || existingPc.iceConnectionState === 'completed')) {
               return;
             }
-            
+
             console.log('Retrying connection with', member.displayName);
             retryStore.updateMemberStatus(remoteDeviceId, 'connecting');
-            
+
             // Initiate connection (higher deviceId initiates)
             if (myDeviceId > remoteDeviceId) {
               try {
                 const newPc = createPeerConnection(remoteDeviceId, true);
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
-                
+
                 ws.current?.send(JSON.stringify({
                   type: 'offer',
                   roomId: room.id,
@@ -446,7 +446,7 @@ export const useWebRTC = () => {
             if (m.deviceId !== myDeviceId) {
               // Check if member already exists
               const existingMember = store.currentRoom?.members.find(member => member.deviceId === m.deviceId);
-              
+
               if (!existingMember) {
                 // New member - add to list
                 store.addMember({
@@ -472,16 +472,16 @@ export const useWebRTC = () => {
 
               // Check if we need to initiate connection
               const pc = peers.current.get(m.deviceId);
-              const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' || 
-                                    pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
-              
+              const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
+                pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
+
               if (shouldInitiate && myDeviceId > m.deviceId) {
                 console.log('Initiating connection with member', m.displayName, '(I am initiator)');
                 try {
                   const newPc = createPeerConnection(m.deviceId, true);
                   const offer = await newPc.createOffer();
                   await newPc.setLocalDescription(offer);
-                  
+
                   ws.current?.send(JSON.stringify({
                     type: 'offer',
                     roomId,
@@ -506,7 +506,7 @@ export const useWebRTC = () => {
           if (member.deviceId !== myDeviceId) {
             // Check if member already exists
             const existingMember = store.currentRoom?.members.find(m => m.deviceId === member.deviceId);
-            
+
             if (!existingMember) {
               // New member - add to list
               console.log('Member joined:', member.displayName);
@@ -533,16 +533,16 @@ export const useWebRTC = () => {
 
             // Check if we need to initiate connection
             const pc = peers.current.get(member.deviceId);
-            const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' || 
-                                  pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
-            
+            const shouldInitiate = !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
+              pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
+
             if (shouldInitiate && myDeviceId > member.deviceId) {
               console.log('Initiating connection with', member.displayName, '(I am initiator)');
               try {
                 const newPc = createPeerConnection(member.deviceId, true);
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
-                
+
                 ws.current?.send(JSON.stringify({
                   type: 'offer',
                   roomId,
@@ -556,6 +556,31 @@ export const useWebRTC = () => {
             } else if (shouldInitiate) {
               console.log('Waiting for offer from', member.displayName, '(they are initiator)');
             }
+
+            // Send my shared files (outbox) to the new member
+            const myFiles = store.currentRoom?.files.filter(f => f.direction === 'outbox') || [];
+            if (myFiles.length > 0) {
+              console.log('Sending file list to new member:', member.displayName, `(${myFiles.length} files)`);
+              myFiles.forEach(file => {
+                const meta: FileMetadataPayload = {
+                  id: file.id,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  uploaderId: store.deviceId!,
+                  uploaderName: getShortName(store.deviceId!),
+                  uploadedAt: file.uploadedAt,
+                  thumbnailUrl: file.thumbnailUrl,
+                };
+
+                // Broadcast metadata (receivers will ignore duplicates)
+                ws.current?.send(JSON.stringify({
+                  type: 'file-meta',
+                  roomId: store.currentRoom?.id,
+                  payload: meta,
+                }));
+              });
+            }
           }
           break;
         }
@@ -563,7 +588,7 @@ export const useWebRTC = () => {
         case 'member-left': {
           const member = msg.payload as MemberPayload;
           console.log('Member left:', member.displayName);
-          
+
           // Clean up peer connection
           const pc = peers.current.get(member.deviceId);
           if (pc) {
@@ -571,7 +596,7 @@ export const useWebRTC = () => {
             peers.current.delete(member.deviceId);
           }
           dataChannels.current.delete(member.deviceId);
-          
+
           store.removeMember(member.deviceId);
           break;
         }
@@ -579,14 +604,14 @@ export const useWebRTC = () => {
         case 'offer': {
           const senderDeviceId = msg.deviceId!;
           if (senderDeviceId === myDeviceId) return;
-          
+
           console.log('Received offer from', senderDeviceId);
           const pc = createPeerConnection(senderDeviceId, false);
-          
+
           await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          
+
           ws.current?.send(JSON.stringify({
             type: 'answer',
             roomId,
@@ -599,7 +624,7 @@ export const useWebRTC = () => {
         case 'answer': {
           const senderDeviceId = msg.deviceId!;
           console.log('Received answer from', senderDeviceId);
-          
+
           const pc = peers.current.get(senderDeviceId);
           if (pc) {
             await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
@@ -670,7 +695,7 @@ export const useWebRTC = () => {
   const connect = useCallback((roomId: string, isCreator: boolean) => {
     const deviceId = getDeviceId();
     const displayName = getShortName(deviceId);
-    
+
     const store = useStore.getState();
     store.setDeviceId(deviceId);
     store.setStatus('connecting');
@@ -684,12 +709,12 @@ export const useWebRTC = () => {
 
     const wsUrl = getSignalingServerUrl();
     console.log('Connecting to signaling server:', wsUrl);
-    
+
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       console.log('WebSocket connected');
-      
+
       const joinPayload = { deviceId, displayName };
       ws.current?.send(JSON.stringify({
         type: 'join',
@@ -846,12 +871,12 @@ export const useWebRTC = () => {
 
                 const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
                 const chunk = buffer.slice(offset, end);
-                
+
                 // Prepend fileId to chunk
                 const combined = new Uint8Array(36 + chunk.byteLength);
                 combined.set(fileIdBytes, 0);
                 combined.set(new Uint8Array(chunk), 36);
-                
+
                 dc.send(combined.buffer);
                 offset = end;
               }
@@ -939,9 +964,9 @@ export const useWebRTC = () => {
 
     // Check periodically (every 5 seconds)
     const intervalId = setInterval(checkConnection, 5000);
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(intervalId);
@@ -949,29 +974,29 @@ export const useWebRTC = () => {
   }, [connect]);
 
   // ============ Retry Connection ============
-  
+
   const retryConnection = useCallback((remoteDeviceId: string) => {
     console.log('Manual retry connection with', remoteDeviceId);
     const store = useStore.getState();
-    
+
     // Clean up existing connection
     cleanupPeerConnection(remoteDeviceId);
-    
+
     // Update status to connecting
     store.updateMemberStatus(remoteDeviceId, 'connecting');
-    
+
     // Create new peer connection
     const myDeviceId = store.deviceId;
     if (!myDeviceId) {
       console.error('Cannot retry: no device ID');
       return;
     }
-    
+
     // Determine if we should be initiator (alphabetically lower device ID initiates)
     const isInitiator = myDeviceId < remoteDeviceId;
-    
+
     const pc = createPeerConnection(remoteDeviceId, isInitiator);
-    
+
     if (isInitiator) {
       // Create offer
       pc.createOffer()
