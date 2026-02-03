@@ -25,13 +25,14 @@ todos:
     status: completed
     dependencies:
       - impl-ui-basic
+isProject: false
 ---
 
-# Mardjan System Architecture & Implementation Plan
+# System Architecture & Implementation Plan
 
 ## 1. System Philosophy (The "Coral" Concept)
 
-Mardjan is a **Zero-Knowledge, Ephemeral, P2P File Transfer** service.
+**CoralSend** is a **Zero-Knowledge, Ephemeral, P2P File Transfer** service.
 
 - **Zero-Knowledge:** The server (Relay/Signaling) never sees the file content or the decryption keys.
 - **Ephemeral:** No data is permanently stored on the server.
@@ -131,7 +132,7 @@ sequenceDiagram
 ## 5. Directory Structure Target
 
 ```text
-mardjan/
+coralsend/
 ├── apps/
 │   ├── web/                 # Next.js
 │   │   ├── src/
@@ -155,3 +156,4 @@ mardjan/
 
 
 ```
+
