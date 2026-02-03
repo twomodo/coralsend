@@ -1,6 +1,6 @@
 ---
-name: Mardjan Comprehensive System Architecture & Scaffold
-overview: Establish the complete architecture and monorepo structure for 'Mardjan'. This plan details the Secure P2P architecture, Signaling Protocol, Security Model, and the implementation roadmap for the MVP using Golang (Signaling) and Next.js (PWA/WebRTC).
+name: CoralSend Comprehensive System Architecture & Scaffold
+overview: Establish the complete architecture and monorepo structure for 'CoralSend'. This plan details the Secure P2P architecture, Signaling Protocol, Security Model, and the implementation roadmap for the MVP using Golang (Signaling) and Next.js (PWA/WebRTC).
 todos:
   - id: scaffold-monorepo
     content: Create Monorepo structure and initialize Go module and Next.js app
