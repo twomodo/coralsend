@@ -70,9 +70,9 @@ services:
     restart: unless-stopped
     volumes:
       - ../conf.d:/etc/nginx/conf.d
-    # ports:
-    #   - 80:80
-    #   - "443:443"
+    ports:
+      - 80:80
+      # - "443:443"
     depends_on:
       - web
       - server
