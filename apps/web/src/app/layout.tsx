@@ -9,19 +9,25 @@ export const metadata: Metadata = {
   creator: 'CoralSend',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     type: 'website',
     title: 'CoralSend - Secure P2P File Transfer',
     description: 'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
     siteName: 'CoralSend',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'CoralSend' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'CoralSend - Secure P2P File Transfer',
     description: 'Transfer files securely and directly between devices.',
+    images: ['/og.png'],
   },
   appleWebApp: {
     capable: true,
