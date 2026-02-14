@@ -28,6 +28,9 @@ services:
         NEXT_PUBLIC_TURN_USER: ${NEXT_PUBLIC_TURN_USER:-coralsend_prod}
         NEXT_PUBLIC_TURN_PASS: ${NEXT_PUBLIC_TURN_PASS:-change-this-turn-password}
     image: ${WEB_IMAGE:-ghcr.io/alifakhimi/coralsend-web:dokploy}
+    environment:
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
     expose:
       - "3000"
     depends_on:
