@@ -25,7 +25,7 @@ export default function RoomPage() {
     // Validate room code
     if (!/^[A-Z0-9]{6}$/.test(extractedRoomId) && !isValidUUID(extractedRoomId)) {
       console.error('Invalid room code:', extractedRoomId);
-      router.push('/');
+      router.push('/app');
       return;
     }
     
@@ -70,7 +70,7 @@ export default function RoomPage() {
   const leaveRoom = () => {
     cleanup();
     useStore.getState().leaveRoom();
-    router.push('/');
+    router.push('/app');
   };
 
   if (!currentRoom || currentRoom.id !== normalizedRoomId) {

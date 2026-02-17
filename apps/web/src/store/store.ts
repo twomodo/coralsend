@@ -117,18 +117,11 @@ interface AppState {
   reset: () => void;
 }
 
+import { generateRoomCode } from '@/lib/roomCode';
+
 // ============ Helpers ============
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
-
-const generateRoomCode = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-};
 
 // ============ Initial State ============
 

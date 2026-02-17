@@ -11,3 +11,5 @@ export { FileList } from './FileList';
 export { RoomHistory } from './RoomHistory';
 export { Chat } from './Chat';
 export { RoomSettings } from './RoomSettings';
+export { SocialLinks } from './SocialLinks';
+export { CreateRoomButton } from './CreateRoomButton';

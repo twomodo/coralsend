@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useStore } from '@/store/store';
 import { getShortName } from '@/lib/deviceId';
 import {
@@ -9,15 +10,19 @@ import {
   Card,
   QRScanner,
   RoomHistory,
+  CreateRoomButton,
+  SocialLinks,
 } from '@/components/ui';
+import { APP_VERSION } from '@/lib/constants';
 import {
-  Plus,
   QrCode,
   ClipboardPaste,
   AlertCircle,
   X,
   ArrowLeft,
   User,
+  BookOpen,
+  Rocket,
 } from 'lucide-react';
 
 interface HomeViewProps {
@@ -50,7 +55,24 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
     <div className="h-screen flex flex-col animate-in fade-in duration-300">
       {/* Header */}
       <header className="flex-shrink-0 p-3 sm:p-4">
-        <div className="max-w-md mx-auto flex items-center justify-end">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-slate-400 hover:text-teal-400 transition-colors text-xs sm:text-sm"
+              aria-label="Home"
+            >
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+            <Link
+              href="/guide"
+              className="flex items-center gap-1.5 text-slate-400 hover:text-teal-400 transition-colors text-xs sm:text-sm"
+              aria-label="Getting Started guide"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Guide</span>
+            </Link>
+          </div>
           {deviceId && (
             <div className="flex items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-full py-1 pl-2.5 pr-3">
               <div className="flex flex-col items-start leading-tight">
@@ -133,21 +155,23 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
           ) : (
             /* Main actions */
             <div className="space-y-3 animate-in fade-in slide-in-from-left duration-200">
-              {/* Create Room */}
-              <button
-                onClick={onCreateRoom}
-                className="w-full group relative bg-gradient-to-r from-teal-500/10 to-cyan-500/10 border border-teal-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:border-teal-400/50 hover:from-teal-500/20 hover:to-cyan-500/20 transition-all"
+              <CreateRoomButton onClick={onCreateRoom} />
+
+              {/* Getting Started */}
+              <Link
+                href="/guide"
+                className="block w-full group relative bg-slate-800/50 border border-slate-700 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:border-teal-500/30 hover:bg-slate-800/80 transition-all"
               >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/25 group-hover:scale-110 transition-transform">
-                    <Plus className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-700 rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" />
                   </div>
                   <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold text-white">Create Room</h3>
-                    <p className="text-slate-400 text-xs sm:text-sm">Start a new sharing session</p>
+                    <h3 className="text-lg sm:text-xl font-semibold text-white">Getting Started</h3>
+                    <p className="text-slate-400 text-xs sm:text-sm">Step-by-step guide to share files</p>
                   </div>
                 </div>
-              </button>
+              </Link>
 
               {/* Join Room */}
               <button
@@ -173,8 +197,15 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
       </div>
 
       {/* Footer */}
-      <footer className="flex-shrink-0 py-2 text-center text-slate-500 text-[10px] sm:text-xs">
+      <footer className="flex-shrink-0 py-3 px-4 flex flex-col items-center gap-2 text-slate-500 text-[10px] sm:text-xs">
         <p>Files are transferred directly between devices</p>
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <span>v{APP_VERSION}</span>
+          <Link href="/guide" className="hover:text-teal-400 transition-colors">
+            Guide
+          </Link>
+          <SocialLinks iconSize={16} />
+        </div>
       </footer>
     </div>
   );
