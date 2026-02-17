@@ -33,7 +33,7 @@ export function MemberAvatar({ member, size = 'md', showStatus = true, className
         className={cn(
           'rounded-full flex items-center justify-center font-bold text-white',
           sizes[size],
-          member.isMe && 'ring-2 ring-teal-400'
+          member.isMe && showStatus && 'ring-2 ring-teal-400'
         )}
         style={{ backgroundColor: bgColor }}
         title={member.displayName}
