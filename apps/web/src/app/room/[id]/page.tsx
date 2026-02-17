@@ -13,7 +13,7 @@ export default function RoomPage() {
   const roomId = params.id as string;
   const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
   
-  const { shareFile, requestFile, sendChat, cleanup, connect, retryConnection } = useWebRTC();
+  const { shareFile, requestFile, sendChat, cleanup, connect, retryConnection, copyTextFile } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
   const status = useStore((s) => s.status);
   
@@ -48,12 +48,23 @@ export default function RoomPage() {
     
     // Clean URL after reading the create flag
     if (isCreate) {
-      window.history.replaceState({}, '', `/room/${extractedRoomId}`);
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      window.history.replaceState({}, '', `${basePath}/room/${extractedRoomId}`);
     }
     
     connect(extractedRoomId, isCreate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedRoomId, currentRoom?.id, status]);
+
+  // Inject pending share files (from PWA share_target) into Outbox when room is ready
+  useEffect(() => {
+    if (!currentRoom || currentRoom.id !== normalizedRoomId) return;
+    const store = useStore.getState();
+    const pending = store.pendingShareFiles;
+    if (pending.length === 0) return;
+    pending.forEach((file) => shareFile(file));
+    store.clearPendingShareFiles();
+  }, [currentRoom?.id, normalizedRoomId, shareFile]);
 
   // Leave room
   const leaveRoom = () => {
@@ -93,6 +104,7 @@ export default function RoomPage() {
           onRequestFile={requestFile}
           onSendChat={sendChat}
           onRetryConnection={retryConnection}
+          onCopyTextFile={copyTextFile}
         />
       </div>
     </main>

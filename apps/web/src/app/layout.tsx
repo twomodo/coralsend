@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { ASSETS } from '@/lib/constants';
+import { PWAProvider } from '@/components/PWAProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -53,7 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="font-sans antialiased">
-        {children}
+        <PWAProvider>{children}</PWAProvider>
       </body>
     </html>
   );

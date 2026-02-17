@@ -110,11 +110,11 @@ export function MemberAvatarStack({ className }: { className?: string }) {
           member={member}
           size="sm"
           showStatus={false}
-          className="ring-2 ring-slate-900"
+          className="rounded-full border border-slate-800 bg-slate-900 shadow-sm"
         />
       ))}
       {remaining > 0 && (
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-medium text-slate-300 ring-2 ring-slate-900">
+        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-medium text-slate-300 border border-slate-800 shadow-sm">
           +{remaining}
         </div>
       )}
