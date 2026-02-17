@@ -165,6 +165,8 @@ export const useWebRTC = () => {
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
   const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
+  const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
+  const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
   const sendAbortController = useRef<AbortController | null>(null);
 
   // ============ Cleanup ============
@@ -192,14 +194,25 @@ export const useWebRTC = () => {
 
     incomingChunks.current.clear();
     pendingFiles.current.clear();
+    receivedFileBlobs.current.clear();
+    requestModes.current.clear();
 
     useStore.getState().reset();
   }, []);
 
-  // ============ File Download ============
+  // ============ File Actions ============
 
-  const downloadFile = useCallback((meta: FileMetadataPayload, chunks: ArrayBuffer[]) => {
-    const blob = new Blob(chunks, { type: meta.type });
+  const copyTextBlobToClipboard = useCallback(async (blob: Blob): Promise<boolean> => {
+    try {
+      const text = await blob.text();
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const triggerDownload = useCallback((meta: FileMetadataPayload, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -209,6 +222,27 @@ export const useWebRTC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, []);
+
+  const finalizeReceivedFile = useCallback(async (fileId: string, meta: FileMetadataPayload, chunks: ArrayBuffer[]) => {
+    const blob = new Blob(chunks, { type: meta.type });
+    if (meta.type.startsWith('text/')) {
+      receivedFileBlobs.current.set(fileId, blob);
+    }
+
+    const mode = requestModes.current.get(fileId) ?? 'download';
+    requestModes.current.delete(fileId);
+
+    if (mode === 'copy' && meta.type.startsWith('text/')) {
+      const copied = await copyTextBlobToClipboard(blob);
+      if (!copied) {
+        // Clipboard can fail due to permissions; fallback to normal download.
+        triggerDownload(meta, blob);
+      }
+      return;
+    }
+
+    triggerDownload(meta, blob);
+  }, [copyTextBlobToClipboard, triggerDownload]);
 
   // ============ Data Channel Handling ============
 
@@ -252,7 +286,7 @@ export const useWebRTC = () => {
           if (incoming) {
             console.log('File transfer complete:', incoming.meta.name);
             store.updateFileStatus(fileId, 'completed');
-            downloadFile(incoming.meta, incoming.chunks);
+            void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
             incomingChunks.current.delete(fileId);
           }
         }
@@ -280,7 +314,7 @@ export const useWebRTC = () => {
         console.warn('Received chunk for unknown fileId:', fileId);
       }
     }
-  }, [downloadFile]);
+  }, [finalizeReceivedFile]);
 
   const setupDataChannel = useCallback((channel: RTCDataChannel, remoteDeviceId: string) => {
     channel.binaryType = 'arraybuffer';
@@ -868,13 +902,14 @@ export const useWebRTC = () => {
     console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
   }, []);
 
-  // Request to download a file
-  const requestFile = useCallback((file: FileMetadata) => {
+  // Request a file, with preferred completion mode for text files.
+  const requestFile = useCallback((file: FileMetadata, mode: 'download' | 'copy' = 'download') => {
     const store = useStore.getState();
     const room = store.currentRoom;
     if (!room || !store.deviceId) return;
 
     console.log('Requesting file:', file.name, 'from', file.uploaderId);
+    requestModes.current.set(file.id, mode);
 
     // Send request via signaling server
     ws.current?.send(JSON.stringify({
@@ -1090,6 +1125,19 @@ export const useWebRTC = () => {
     }
   }, [cleanupPeerConnection, createPeerConnection]);
 
+  // Copy text file content. If blob is not local yet, request file in copy mode.
+  const copyTextFile = useCallback(async (file: FileMetadata): Promise<boolean> => {
+    if (!file.type.startsWith('text/')) return false;
+
+    const blob = receivedFileBlobs.current.get(file.id);
+    if (blob) {
+      return copyTextBlobToClipboard(blob);
+    }
+
+    requestFile(file, 'copy');
+    return false;
+  }, [copyTextBlobToClipboard, requestFile]);
+
   // ============ Return ============
 
   return {
@@ -1099,5 +1147,6 @@ export const useWebRTC = () => {
     sendChat,
     cleanup,
     retryConnection,
+    copyTextFile,
   };
 };

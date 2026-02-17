@@ -48,6 +48,41 @@ export default function Home() {
     }
   }, [router]);
 
+  // Handle PWA share_target: read shared files from cache and store as pending
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('caches' in window)) return;
+    const params = new URLSearchParams(window.location.search);
+    const shareTarget = params.get('share-target');
+    if (shareTarget !== '1') return;
+
+    const SHARE_CACHE = 'coralsend-share-target';
+    (async () => {
+      try {
+        const cache = await caches.open(SHARE_CACHE);
+        const countRes = await cache.match('count');
+        const count = countRes ? parseInt(await countRes.text(), 10) : 0;
+        const files: File[] = [];
+        for (let i = 0; i < count; i++) {
+          const res = await cache.match(`file-${i}`);
+          if (!res) continue;
+          const blob = await res.blob();
+          const name = res.headers.get('X-Shared-Filename') || `shared-${i}`;
+          files.push(new File([blob], name, { type: blob.type || 'application/octet-stream' }));
+          await cache.delete(`file-${i}`);
+        }
+        await cache.delete('count');
+        if (files.length > 0) {
+          useStore.getState().setPendingShareFiles(files);
+        }
+      } catch (err) {
+        console.error('[CoralSend] Failed to read shared files from cache:', err);
+      }
+      // Clean URL so refresh doesn't re-run
+      const path = window.location.pathname + window.location.hash || '';
+      window.history.replaceState({}, '', path);
+    })();
+  }, []);
+
   // Create new room
   const createRoom = () => {
     const roomId = generateRoomCode();

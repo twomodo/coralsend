@@ -30,6 +30,7 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
   const [showScanner, setShowScanner] = useState(false);
   const deviceId = useStore((s) => s.deviceId);
   const error = useStore((s) => s.error);
+  const pendingShareFiles = useStore((s) => s.pendingShareFiles);
   const [linkError, setLinkError] = useState<string | null>(null);
 
   // Handle connection errors
@@ -89,6 +90,15 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
                   <X className="w-4 h-4 text-red-400" />
                 </button>
               </div>
+            </Card>
+          )}
+
+          {/* Pending share files (from PWA share_target) */}
+          {pendingShareFiles.length > 0 && (
+            <Card variant="bordered" className="border-teal-500/30 bg-teal-500/5">
+              <p className="text-teal-400 text-sm">
+                You have {pendingShareFiles.length} file{pendingShareFiles.length !== 1 ? 's' : ''} to share. Create or join a room to send them.
+              </p>
             </Card>
           )}
 
