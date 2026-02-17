@@ -1,8 +1,6 @@
-'use client';
-
 import Link from 'next/link';
 import { Shield, Smartphone, Share2, UserX, Zap } from 'lucide-react';
-import { Logo, SocialLinks } from '@/components/ui';
+import { SocialLinks } from '@/components/ui';
 import { APP_VERSION } from '@/lib/constants';
 
 const FEATURES = [

@@ -1,35 +1,97 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { WelcomeView } from '@/components/welcome/WelcomeView';
+import { getSiteUrl } from '@/lib/site';
 
-export default function WelcomePage() {
-  const router = useRouter();
+export const metadata: Metadata = {
+  title: 'CoralSend - Fast Private File Transfer',
+  description:
+    'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'CoralSend - Fast Private File Transfer',
+    description:
+      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+    url: '/',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CoralSend - Fast Private File Transfer',
+    description:
+      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+  },
+};
 
-  // If URL has ?room= or ?share-target=1, send to app (which handles room redirect and share_target)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
-    const shareTarget = params.get('share-target');
+type PageSearchParams = {
+  room?: string | string[];
+  'share-target'?: string | string[];
+};
 
-    if (roomParam) {
-      const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
-      if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
-        router.replace(`/room/${roomId}`);
-        return;
-      }
+function firstParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function WelcomePage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
+  const params = await searchParams;
+  const roomParam = firstParam(params.room);
+  const shareTarget = firstParam(params['share-target']);
+
+  if (roomParam) {
+    const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
+    if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
+      redirect(`/room/${roomId}`);
     }
+  }
 
-    if (shareTarget === '1') {
-      router.replace('/app?share-target=1');
-    }
-  }, [router]);
+  if (shareTarget === '1') {
+    redirect('/app?share-target=1');
+  }
+
+  const siteUrl = getSiteUrl();
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'CoralSend',
+    url: siteUrl,
+    description:
+      'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
+  };
+
+  const appJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'CoralSend',
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Web',
+    url: siteUrl,
+    description:
+      'Create a room, share the link, and send files straight to another device over encrypted WebRTC channels.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-auto">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+      />
       <div
         className="fixed inset-0 opacity-30 pointer-events-none"
         style={{
