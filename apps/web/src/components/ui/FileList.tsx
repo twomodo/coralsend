@@ -7,6 +7,7 @@ import { Progress } from './Progress';
 import { Button } from './Button';
 import {
   Download,
+  Copy,
   CheckCircle,
   AlertCircle,
   Loader2,
@@ -46,15 +47,18 @@ const fileTypeCategories = [
 interface FileItemProps {
   file: FileMetadata;
   onDownload?: (file: FileMetadata) => void;
+  onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
 }
 
-function FileItem({ file, onDownload }: FileItemProps) {
+function FileItem({ file, onDownload, onCopyTextFile }: FileItemProps) {
   const isDownloading = file.status === 'downloading';
   const isCompleted = file.status === 'completed';
   const isError = file.status === 'error';
   const isInbox = file.direction === 'inbox';
   const isImage = file.type.startsWith('image/');
   const isVideo = file.type.startsWith('video/');
+  const isTextFile = file.type.startsWith('text/');
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Get thumbnail URL if available (for completed files)
   const thumbnailUrl = file.thumbnailUrl;
@@ -117,19 +121,42 @@ function FileItem({ file, onDownload }: FileItemProps) {
           )}
         </div>
 
-        {/* Action button */}
+        {/* Action buttons */}
         <div className="flex flex-col gap-2 flex-shrink-0">
           {/* Download/Retry button for inbox */}
           {isInbox && !isDownloading && (
-            <Button
-              variant={isError ? 'secondary' : 'primary'}
-              size="sm"
-              onClick={() => onDownload?.(file)}
-              className="text-xs sm:text-sm"
-            >
-              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">{isError ? 'Retry' : isCompleted ? 'Download' : 'Download'}</span>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {isTextFile && onCopyTextFile && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    const ok = await onCopyTextFile(file);
+                    if (ok) {
+                      setCopySuccess(true);
+                      setTimeout(() => setCopySuccess(false), 2000);
+                    }
+                  }}
+                  className="text-xs sm:text-sm"
+                  aria-label="Copy text"
+                  title="Copy text"
+                >
+                  {copySuccess ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> : <Copy className="w-3 h-3 sm:w-4 sm:h-4" />}
+                  <span className="hidden sm:inline">{copySuccess ? 'Copied!' : 'Copy'}</span>
+                </Button>
+              )}
+              <Button
+                variant={isError ? 'secondary' : 'primary'}
+                size="sm"
+                onClick={() => onDownload?.(file)}
+                className="text-xs sm:text-sm"
+                aria-label={isError ? 'Retry download' : 'Download file'}
+                title={isError ? 'Retry download' : 'Download file'}
+              >
+                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{isError ? 'Retry' : isCompleted ? 'Download' : 'Download'}</span>
+              </Button>
+            </div>
           )}
           
           {/* Downloading indicator */}
@@ -203,10 +230,12 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
 interface FileListProps {
   direction: 'inbox' | 'outbox';
   onDownload?: (file: FileMetadata) => void;
+  onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
   className?: string;
+  hideHeader?: boolean;
 }
 
-export function FileList({ direction, onDownload, className }: FileListProps) {
+export function FileList({ direction, onDownload, onCopyTextFile, className, hideHeader }: FileListProps) {
   const allFiles = useStore((s) => s.currentRoom?.files);
   const members = useStore((s) => s.currentRoom?.members);
   
@@ -285,15 +314,17 @@ export function FileList({ direction, onDownload, className }: FileListProps) {
   return (
     <div className={cn('space-y-4', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className={cn('w-5 h-5', isInbox ? 'text-cyan-400' : 'text-teal-400')} />
-          <h3 className="font-semibold text-white">{title}</h3>
-          <span className="text-sm text-slate-500">
-            ({filteredFiles.length}{files.length !== filteredFiles.length && ` / ${files.length}`})
-          </span>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className={cn('w-5 h-5', isInbox ? 'text-cyan-400' : 'text-teal-400')} />
+            <h3 className="font-semibold text-white">{title}</h3>
+            <span className="text-sm text-slate-500">
+              ({filteredFiles.length}{files.length !== filteredFiles.length && ` / ${files.length}`})
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       {files.length > 0 && (
@@ -363,7 +394,7 @@ export function FileList({ direction, onDownload, className }: FileListProps) {
       {filteredFiles.length > 0 ? (
         <div className="space-y-2">
           {filteredFiles.map((file) => (
-            <FileItem key={file.id} file={file} onDownload={onDownload} />
+            <FileItem key={file.id} file={file} onDownload={onDownload} onCopyTextFile={onCopyTextFile} />
           ))}
         </div>
       ) : (

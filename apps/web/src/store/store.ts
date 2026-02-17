@@ -108,6 +108,11 @@ interface AppState {
   removeFromHistory: (roomId: string) => void;
   clearHistory: () => void;
   
+  // Pending share (from PWA share_target; not persisted)
+  pendingShareFiles: File[];
+  setPendingShareFiles: (files: File[]) => void;
+  clearPendingShareFiles: () => void;
+  
   // Actions - Reset
   reset: () => void;
 }
@@ -134,6 +139,7 @@ const initialState = {
   error: null,
   currentRoom: null,
   roomHistory: [],
+  pendingShareFiles: [] as File[],
 };
 
 // ============ Store ============
@@ -389,10 +395,14 @@ export const useStore = create<AppState>()(
         set({ roomHistory: [] });
       },
 
+      // Pending share (from PWA share_target)
+      setPendingShareFiles: (files) => set({ pendingShareFiles: files }),
+      clearPendingShareFiles: () => set({ pendingShareFiles: [] }),
+
       // Reset
       reset: () => {
         const { deviceId, roomHistory } = get();
-        set({ ...initialState, deviceId, roomHistory });
+        set({ ...initialState, deviceId, roomHistory, pendingShareFiles: [] });
       },
     }),
     {
