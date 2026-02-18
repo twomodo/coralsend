@@ -18,9 +18,10 @@ It is designed around two goals:
 
 ## What this repo currently implements (MVP)
 
-- **Room-based pairing** using a UUID `room` value in the URL (QR code + copy/paste link).
-- **Signaling server** (WebSocket) that only relays SDP/ICE and a `peer-joined` event.
+- **Room-based joining** with either a short room code (6 chars) or UUID (`/room/<id>` or `?room=<id>`).
+- **Multi-peer room presence** (`member-list`, `member-joined`, `member-left`) over WebSocket signaling.
 - **P2P file transfer** over WebRTC DataChannel using chunking + progress UI.
+- **PWA share target flow** to receive files from other apps into CoralSend.
 - **No server-side file storage** (server never receives file bytes).
 
 ## Important security note (honest status)
@@ -70,19 +71,19 @@ flowchart TD
 
   SenderRTC <-->|"DTLS_encrypted_DataChannel"| ReceiverRTC
   SenderWS -->|"join/offer/answer/candidate"| Hub
-  Hub -->|"peer-joined/relay_signaling"| ReceiverWS
+  Hub -->|"member-list/member-joined/relay_signaling"| ReceiverWS
 ```
 
 #### 2) Connection sequence (pairing + WebRTC)
 
 ```mermaid
 sequenceDiagram
-  participant A as SenderBrowser
+  participant A as BrowserA
   participant S as SignalingServer
-  participant B as ReceiverBrowser
+  participant B as BrowserB
 
-  A->>A: Generate room UUID
-  A->>B: Share link/QR "?room=<uuid>"
+  A->>A: Generate room code (or UUID)
+  A->>B: Share link/QR "/room/<id>" or "?room=<id>"
 
   A->>S: WS connect
   A->>S: join(room)
@@ -90,7 +91,7 @@ sequenceDiagram
   B->>S: WS connect
   B->>S: join(room)
 
-  S-->>A: peer-joined
+  S-->>A: member-list/member-joined
   A->>S: offer(SDP)
   S-->>B: offer(SDP)
 
@@ -115,23 +116,28 @@ sequenceDiagram
 
 ### Connection flow
 
-1. **Sender** creates a room (UUID) and shares a link: `http(s)://<host>:<port>/?room=<uuid>`
-2. **Receiver** opens the link (or scans QR) and automatically enters Receive mode.
-3. Both clients open a WebSocket to the signaling server and `join` the room.
-4. When both clients are present, sender creates an **SDP offer**, receiver answers, both exchange **ICE candidates**.
-5. When WebRTC DataChannel opens, clients are considered **connected**.
-6. Sender sends **metadata**, then file chunks via DataChannel.
-7. Receiver reassembles the file and downloads it.
+1. A user creates a room code and shares a link: `http(s)://<host>:<port>/room/<id>` (or `?room=<id>`).
+2. Other users join via QR, pasted link, room code, or browser share-target flow.
+3. Clients open a WebSocket to signaling and send `join`.
+4. Server synchronizes room membership via `member-list` and `member-joined`.
+5. Peers exchange **SDP offer/answer** and **ICE candidates** (directed by `targetId`).
+6. When each WebRTC DataChannel opens, peers are considered connected.
+7. File metadata is announced (`file-meta`), receivers request files (`file-request`), then chunks flow over DataChannel.
 
 ### Signaling message types
 
 The signaling server relays JSON messages shaped like:
 
-- `join`: join a room
-- `peer-joined`: server informs peers that another client is present
-- `offer`: SDP offer from sender → receiver
-- `answer`: SDP answer from receiver → sender
-- `candidate`: ICE candidates both ways
+- `join`: join a room with device metadata
+- `member-list`: current room members (presence snapshot)
+- `member-joined`: notify others about a newly joined member
+- `member-left`: notify remaining members when someone disconnects
+- `offer`: SDP offer (targeted to a peer)
+- `answer`: SDP answer (targeted to a peer)
+- `candidate`: ICE candidates (targeted to a peer)
+- `file-meta`: announce available file metadata
+- `file-request`: request file transfer from uploader
+- `chat`: room text chat payload relay
 
 ## Trust model / Threat model (MVP)
 
@@ -159,7 +165,7 @@ The signaling server relays JSON messages shaped like:
 - Node.js 20+
 - (Optional) Docker & Docker Compose
 
-### Environment Variables
+### Environment variables
 
 CoralSend supports configuration via environment variables. Copy `.env.example` to `.env` and configure:
 
@@ -170,7 +176,13 @@ cp .env.example .env
 **Key variables:**
 
 - `NEXT_PUBLIC_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
+- `NEXT_PUBLIC_SITE_URL`: Public site origin used for canonical metadata, sitemap, robots, and `llms.txt` URLs.
+- `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/web/package.json` if unset).
 - `NEXT_PUBLIC_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
+- `NEXT_PUBLIC_STUN_URL`: STUN server URL for ICE gathering.
+- `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`: TURN relay configuration.
+- `NEXT_PUBLIC_ICE_DIAGNOSTICS`: Enables additional ICE path/error logs in browser console when set to `true`.
+- `NEXT_PUBLIC_GITHUB_URL` (+ optional social URLs): Used for footer/changelog social links.
 
 **Example for subdirectory deployment:**
 ```bash
@@ -221,7 +233,8 @@ npm run dev -- -H 0.0.0.0
 
 Then open from your phone:
 
-- `http://<your-laptop-ip>:3000`
+- landing page: `http://<your-laptop-ip>:3000`
+- app home: `http://<your-laptop-ip>:3000/app`
 
 The app will automatically compute the WebSocket URL for signaling using your current hostname (e.g. `ws://<your-laptop-ip>:8080/ws`).
 
@@ -344,11 +357,11 @@ This repository includes a GitHub Actions workflow at `.github/workflows/docker.
 
 ### Functional checks
 
-- Sender shows a QR and “Waiting for peer…”
-- Receiver opens link and shows “Connecting…”
-- Console logs show: `peer-joined` → `offer` → `answer` → `candidate`
-- DataChannel opens and UI switches to “Connected”
-- File transfer progress reaches 100% and receiver downloads the file
+- Creator can generate a room and share `/room/<id>` (or copy/paste equivalent).
+- Joiner opens link or scans QR and shows connecting status.
+- Console logs show presence + signaling flow: `member-list/member-joined` → `offer` → `answer` → `candidate`.
+- DataChannel opens and members show online/connected.
+- File transfer progress reaches 100% and receiver downloads the file.
 
 ### Security checks (MVP reality)
 

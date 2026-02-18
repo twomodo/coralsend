@@ -62,3 +62,15 @@ if (envTurnUrl && envTurnUser && envTurnPass) {
   });
 }
 
+/** App version (injected at build from package.json or env) */
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
+
+/** Social links — all from env; only non-empty values should be displayed */
+export const SOCIAL_LINKS = {
+  github: process.env.NEXT_PUBLIC_GITHUB_URL?.trim() || '',
+  twitter: process.env.NEXT_PUBLIC_TWITTER_URL?.trim() || '',
+  telegram: process.env.NEXT_PUBLIC_TELEGRAM_URL?.trim() || '',
+  instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim() || '',
+  linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL?.trim() || '',
+} as const;
+

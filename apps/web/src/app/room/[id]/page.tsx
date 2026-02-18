@@ -13,7 +13,7 @@ export default function RoomPage() {
   const roomId = params.id as string;
   const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
   
-  const { shareFile, requestFile, sendChat, cleanup, connect, retryConnection, copyTextFile } = useWebRTC();
+  const { shareFile, requestFile, cancelFileDownload, sendChat, cleanup, connect, retryConnection, copyTextFile } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
   const status = useStore((s) => s.status);
   
@@ -25,7 +25,7 @@ export default function RoomPage() {
     // Validate room code
     if (!/^[A-Z0-9]{6}$/.test(extractedRoomId) && !isValidUUID(extractedRoomId)) {
       console.error('Invalid room code:', extractedRoomId);
-      router.push('/');
+      router.push('/app');
       return;
     }
     
@@ -70,12 +70,12 @@ export default function RoomPage() {
   const leaveRoom = () => {
     cleanup();
     useStore.getState().leaveRoom();
-    router.push('/');
+    router.push('/app');
   };
 
   if (!currentRoom || currentRoom.id !== normalizedRoomId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center">
+      <div className="page-shell flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-400 mx-auto mb-4"></div>
           <p className="text-slate-400">Connecting to room...</p>
@@ -85,23 +85,15 @@ export default function RoomPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      {/* Background pattern */}
-      <div className="fixed inset-0 opacity-30">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(20, 184, 166, 0.15) 0%, transparent 50%),
-                             radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%)`,
-          }}
-        />
-      </div>
+    <main className="page-shell overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
+      <div className="page-glow" />
 
       <div className="relative z-10">
         <RoomView
           onLeaveRoom={leaveRoom}
           onShareFile={shareFile}
           onRequestFile={requestFile}
+          onCancelDownload={cancelFileDownload}
           onSendChat={sendChat}
           onRetryConnection={retryConnection}
           onCopyTextFile={copyTextFile}

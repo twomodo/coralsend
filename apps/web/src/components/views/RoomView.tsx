@@ -4,20 +4,21 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useStore, type FileMetadata } from '@/store/store';
 import { getBaseUrl } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import {
   Button,
-  Card,
   MemberList,
   MemberAvatarStack,
   FileList,
-  Chat,
+  BottomSheet,
+  PanelCard,
+  ChatMessages,
+  ChatInput,
   RoomSettings,
 } from '@/components/ui';
 import {
-  Plus,
   Copy,
   Check,
-  X,
   ArrowLeft,
   FileUp,
   Share2,
@@ -26,6 +27,8 @@ import {
   Send,
   Settings,
   ClipboardPaste,
+  MessageSquare,
+  ChevronUp,
 } from 'lucide-react';
 
 // Paste type filter: match file type (same categories as FileList)
@@ -47,26 +50,26 @@ interface RoomViewProps {
   onLeaveRoom: () => void;
   onShareFile: (file: File) => void;
   onRequestFile: (file: FileMetadata) => void;
+  onCancelDownload?: (fileId: string) => void;
   onSendChat: (message: string) => void;
   onRetryConnection?: (deviceId: string) => void;
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
 }
 
-export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, onRetryConnection, onCopyTextFile }: RoomViewProps) {
+export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDownload, onSendChat, onRetryConnection, onCopyTextFile }: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
+  const [showMembers, setShowMembers] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
   const [isDragOver, setIsDragOver] = useState(false);
-  const [pasteTypeFilter, setPasteTypeFilter] = useState<string>('all');
+  const [pasteTypeFilter] = useState<string>('all');
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  if (!currentRoom) return null;
-
-  const shareUrl = `${getBaseUrl()}/room/${currentRoom.id}`;
+  const shareUrl = currentRoom ? `${getBaseUrl()}/room/${currentRoom.id}` : '';
 
   // Paste from clipboard (keyboard or button): filter and share
   const processPastedFiles = useCallback(
@@ -146,15 +149,14 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
     } finally {
       setIsPasting(false);
     }
-  }, [processPastedFiles]);
+  }, [processPastedFiles, pasteTypeFilter]);
 
   const canUsePasteButton = typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
 
   // Copy share link
   const copyLink = async () => {
     try {
-      const link = `${getBaseUrl()}/room/${currentRoom.id}`;
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(shareUrl);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
@@ -183,170 +185,234 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
     }
   };
 
+  const roomFiles = currentRoom?.files ?? [];
+  const roomMessages = currentRoom?.messages ?? [];
+  const inboxCount = roomFiles.filter((f) => f.direction === 'inbox').length;
+  const outboxCount = roomFiles.filter((f) => f.direction === 'outbox').length;
+  const panelCount = activeTab === 'inbox' ? inboxCount : outboxCount;
+  const lastMessage = roomMessages[roomMessages.length - 1];
+  const unreadCount = showChat ? 0 : roomMessages.filter((m) => !m.isMe).length;
+
+  if (!currentRoom) return null;
+
   return (
-    <div className="h-screen flex flex-col animate-in fade-in slide-in-from-right duration-300">
+    <div className="h-dvh flex flex-col animate-in fade-in slide-in-from-right duration-300">
       {/* Header */}
-      <header className="p-4 border-b border-slate-800">
+      <header className="px-3 py-2.5 border-b border-[var(--border-soft)] glass-strong">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={onLeaveRoom}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="font-semibold text-white">Room {currentRoom.id}</h1>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
+              <h1 className="font-semibold text-[var(--text-primary)] text-sm">Room {currentRoom.id}</h1>
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <Users className="w-3 h-3" />
                 <span>{currentRoom.members.length} members</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <MemberAvatarStack />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowMembers(true)}
+              className="rounded-lg hover:opacity-85 transition-opacity"
+              aria-label="Show members"
+            >
+              <MemberAvatarStack />
+            </button>
             <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
               <Settings className="w-4 h-4" />
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setShowShare(true)}>
               <Share2 className="w-4 h-4" />
-              Share
+              <span className="hidden sm:inline">Share</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Share modal */}
-          {showShare && (
-            <Card variant="glow" className="animate-in fade-in duration-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-white">Share Room</h3>
-                <Button variant="ghost" size="icon" onClick={() => setShowShare(false)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <div className="bg-white p-3 rounded-xl">
-                  <QRCodeSVG value={shareUrl} size={150} level="H" />
-                </div>
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <p className="text-sm text-slate-400 mb-1">Room Code</p>
-                    <p className="text-2xl font-mono font-bold text-teal-400">{currentRoom.id}</p>
-                  </div>
-                  <Button variant="secondary" onClick={copyLink} className="w-full sm:w-auto">
-                    {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    {copySuccess ? 'Copied!' : 'Copy Link'}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Member list */}
-          <Card variant="bordered">
-            <MemberList onRetryConnection={onRetryConnection} />
-          </Card>
-
-          {/* Tab navigation */}
-          <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+      <div className="flex-1 min-h-0 flex flex-col max-w-2xl mx-auto w-full">
+        <div className="shrink-0 px-3 pt-2">
+          <div className="flex gap-1 glass rounded-lg p-1 border border-[var(--border-soft)]">
             <button
               onClick={() => setActiveTab('inbox')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'inbox'
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white'
-                }`}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors',
+                activeTab === 'inbox'
+                  ? 'bg-teal-500 text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              )}
             >
               <Inbox className="w-4 h-4" />
               Inbox
+              {inboxCount > 0 && (
+                <span
+                  className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full transition-colors',
+                    activeTab === 'inbox'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-cyan-500/20 text-cyan-500 dark:text-cyan-300'
+                  )}
+                >
+                  {inboxCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('outbox')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'outbox'
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white'
-                }`}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors',
+                activeTab === 'outbox'
+                  ? 'bg-teal-500 text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              )}
             >
               <Send className="w-4 h-4" />
               Outbox
+              {outboxCount > 0 && (
+                <span
+                  className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full transition-colors',
+                    activeTab === 'outbox'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-teal-500/20 text-teal-600 dark:text-teal-300'
+                  )}
+                >
+                  {outboxCount}
+                </span>
+              )}
             </button>
           </div>
+        </div>
 
-          {/* File list */}
-          <Card variant="bordered" className="flex flex-col overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-4">
-              {activeTab === 'outbox' && (
-                <>
-                  {/* Outbox header - same structure as FileList/Inbox header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Send className="w-5 h-5 text-teal-400" />
-                      <h3 className="font-semibold text-white">Outbox</h3>
-                      <span className="text-sm text-slate-500">
-                        ({currentRoom.files.filter((f) => f.direction === 'outbox').length})
-                      </span>
-                    </div>
-                  </div>
-                  {/* Outbox toolbar */}
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="text-sm font-medium text-slate-400">Your Shared Files</span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300 transition-colors px-2 py-1 rounded-md hover:bg-teal-400/10"
-                        aria-label="Add file"
-                        title="Add file"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Add File</span>
-                      </button>
-                      {canUsePasteButton && (
-                        <button
-                          type="button"
-                          onClick={handlePasteClick}
-                          disabled={isPasting}
-                          className="flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300 transition-colors px-2 py-1 rounded-md hover:bg-teal-400/10 disabled:opacity-50"
-                          aria-label="Paste from clipboard"
-                          title="Paste from clipboard"
-                        >
-                          <ClipboardPaste className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">{isPasting ? 'Pasting…' : 'Paste'}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-slate-500">Paste accepts:</span>
-                    {PASTE_ACCEPT_TYPES.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setPasteTypeFilter(opt.id)}
-                        className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                          pasteTypeFilter === opt.id
-                            ? 'bg-teal-500/20 text-teal-400'
-                            : 'text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  {pasteError && (
-                    <p className="text-xs text-red-400">{pasteError}</p>
+        <div className="flex-1 min-h-0 px-3 py-2">
+          <PanelCard
+            className="h-full"
+            icon={
+              activeTab === 'inbox'
+                ? <Inbox className="w-5 h-5 text-cyan-400" />
+                : <Send className="w-5 h-5 text-teal-400" />
+            }
+            title={activeTab === 'inbox' ? 'Inbox' : 'Outbox'}
+            badge={
+              <span className="text-sm text-[var(--text-muted)]">
+                ({panelCount})
+              </span>
+            }
+            actions={
+              activeTab === 'outbox' ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-teal-500 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors px-2.5 py-1.5 rounded-md hover:bg-teal-400/10 border border-teal-400/20 min-h-8"
+                    aria-label="Add file to share"
+                    title="Add file to share"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    <span>Add</span>
+                  </button>
+                  {canUsePasteButton && (
+                    <button
+                      type="button"
+                      onClick={handlePasteClick}
+                      disabled={isPasting}
+                      className="flex items-center gap-1.5 text-xs font-medium text-teal-500 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors px-2.5 py-1.5 rounded-md hover:bg-teal-400/10 border border-teal-400/20 min-h-8 disabled:opacity-50"
+                      aria-label="Paste from clipboard"
+                      title="Paste from clipboard"
+                    >
+                      <ClipboardPaste className="w-4 h-4" />
+                      <span>{isPasting ? 'Pasting…' : 'Paste'}</span>
+                    </button>
                   )}
-                </>
-              )}
-              <FileList direction={activeTab} onDownload={onRequestFile} onCopyTextFile={onCopyTextFile} hideHeader={activeTab === 'outbox'} />
-            </div>
-          </Card>
-
-          {/* Chat */}
-          <Chat messages={currentRoom.messages} onSend={onSendChat} />
+                </div>
+              ) : undefined
+            }
+          >
+            {pasteError && <p className="text-xs text-red-400 mb-2">{pasteError}</p>}
+            <FileList
+              direction={activeTab}
+              onDownload={onRequestFile}
+              onCancelDownload={onCancelDownload}
+              onCopyTextFile={onCopyTextFile}
+              hideHeader
+              hideFilters
+            />
+          </PanelCard>
         </div>
       </div>
+
+      {/* Chat ticker row */}
+      <div className="shrink-0 max-w-2xl mx-auto w-full px-3 pb-2">
+        <button
+          onClick={() => setShowChat(true)}
+          className="w-full flex items-center gap-3 px-4 py-2.5 glass border border-[var(--border-soft)] rounded-xl hover:bg-[var(--surface-glass-strong)] transition-colors shadow-sm"
+        >
+          <MessageSquare className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+          <span className="flex-1 text-left text-sm truncate text-[var(--text-primary)]">
+            {lastMessage ? lastMessage.text : 'No messages yet'}
+          </span>
+          {unreadCount > 0 && (
+            <span className="bg-teal-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              {unreadCount}
+            </span>
+          )}
+          <ChevronUp className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+        </button>
+      </div>
+
+      {/* Members sheet */}
+      <BottomSheet
+        isOpen={showMembers}
+        onClose={() => setShowMembers(false)}
+        title={
+          <span className="flex items-center gap-2">
+            <span>Members</span>
+            <span className="text-sm font-normal text-[var(--text-muted)]">
+              ({currentRoom.members.length})
+            </span>
+          </span>
+        }
+        icon={<Users className="w-4 h-4 text-[var(--text-muted)]" />}
+      >
+        <MemberList onRetryConnection={onRetryConnection} />
+      </BottomSheet>
+
+      {/* Chat sheet */}
+      <BottomSheet
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+        title="Chat"
+        icon={<MessageSquare className="w-4 h-4 text-[var(--text-muted)]" />}
+        footer={<ChatInput onSend={onSendChat} />}
+      >
+        <ChatMessages messages={roomMessages} />
+      </BottomSheet>
+
+      {/* Share sheet */}
+      <BottomSheet
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        title="Share Room"
+        icon={<Share2 className="w-4 h-4 text-[var(--text-muted)]" />}
+      >
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="bg-white p-3 rounded-xl">
+            <QRCodeSVG value={shareUrl} size={150} level="H" />
+          </div>
+          <div className="flex-1 space-y-3">
+            <div>
+              <p className="text-sm text-[var(--text-muted)] mb-1">Room Code</p>
+              <p className="text-2xl font-mono font-bold text-teal-400">{currentRoom.id}</p>
+            </div>
+            <Button variant="secondary" onClick={copyLink} className="w-full sm:w-auto">
+              {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copySuccess ? 'Copied!' : 'Copy Link'}
+            </Button>
+          </div>
+        </div>
+      </BottomSheet>
 
       {/* Hidden file input */}
       <input
@@ -360,14 +426,14 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onSendChat, 
       {/* Drop zone overlay */}
       {isDragOver && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/90 flex items-center justify-center"
+          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center"
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
         >
           <div className="text-center">
             <FileUp className="w-16 h-16 text-teal-400 mx-auto mb-4" />
-            <p className="text-xl font-semibold text-white">Drop files to share</p>
+            <p className="text-xl font-semibold text-[var(--text-primary)]">Drop files to share</p>
           </div>
         </div>
       )}

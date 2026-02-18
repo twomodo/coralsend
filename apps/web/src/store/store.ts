@@ -72,6 +72,10 @@ interface AppState {
   // Room history (persisted)
   roomHistory: Room[];
   
+  // File downloaders (fileId -> list of {deviceId, displayName}) - not persisted
+  fileDownloaders: Record<string, Array<{ deviceId: string; displayName: string }>>;
+  fileDownloaderProgress: Record<string, Record<string, number>>;
+  
   // Actions - Device
   setDeviceId: (id: string) => void;
   
@@ -98,6 +102,9 @@ interface AppState {
   updateFileProgress: (fileId: string, progress: number) => void;
   updateFileStatus: (fileId: string, status: FileMetadata['status']) => void;
   removeFile: (fileId: string) => void;
+  addFileDownloader: (fileId: string, deviceId: string, displayName: string) => void;
+  removeFileDownloader: (fileId: string, deviceId: string) => void;
+  updateFileDownloaderProgress: (fileId: string, deviceId: string, progress: number) => void;
   
   // Actions - Chat
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
@@ -117,18 +124,11 @@ interface AppState {
   reset: () => void;
 }
 
+import { generateRoomCode } from '@/lib/roomCode';
+
 // ============ Helpers ============
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
-
-const generateRoomCode = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-};
 
 // ============ Initial State ============
 
@@ -139,6 +139,8 @@ const initialState = {
   error: null,
   currentRoom: null,
   roomHistory: [],
+  fileDownloaders: {} as Record<string, Array<{ deviceId: string; displayName: string }>>,
+  fileDownloaderProgress: {} as Record<string, Record<string, number>>,
   pendingShareFiles: [] as File[],
 };
 
@@ -332,13 +334,61 @@ export const useStore = create<AppState>()(
 
       // Files - Remove
       removeFile: (fileId) => {
-        const { currentRoom } = get();
+        const { currentRoom, fileDownloaders } = get();
         if (!currentRoom) return;
-        
+        const { [fileId]: _, ...rest } = fileDownloaders;
         set({
           currentRoom: {
             ...currentRoom,
             files: currentRoom.files.filter(f => f.id !== fileId),
+          },
+          fileDownloaders: rest,
+        });
+      },
+
+      // Files - Downloaders (who is downloading each file)
+      addFileDownloader: (fileId, deviceId, displayName) => {
+        const { fileDownloaders } = get();
+        const list = fileDownloaders[fileId] || [];
+        if (list.some(d => d.deviceId === deviceId)) return;
+        set({
+          fileDownloaders: {
+            ...fileDownloaders,
+            [fileId]: [...list, { deviceId, displayName }],
+          },
+        });
+      },
+
+      removeFileDownloader: (fileId, deviceId) => {
+        const { fileDownloaders, fileDownloaderProgress } = get();
+        const nextList = (fileDownloaders[fileId] || []).filter(d => d.deviceId !== deviceId);
+        const prog = fileDownloaderProgress[fileId];
+        const { [deviceId]: _, ...restProg } = prog || {};
+        const nextProgByFile = Object.keys(restProg).length > 0 ? restProg : null;
+        const nextDownloaders =
+          nextList.length === 0
+            ? (() => {
+                const { [fileId]: __, ...r } = fileDownloaders;
+                return r;
+              })()
+            : { ...fileDownloaders, [fileId]: nextList };
+        const nextProgress =
+          nextList.length === 0
+            ? (() => {
+                const { [fileId]: __, ...r } = fileDownloaderProgress;
+                return r;
+              })()
+            : { ...fileDownloaderProgress, [fileId]: nextProgByFile ?? {} };
+        set({ fileDownloaders: nextDownloaders, fileDownloaderProgress: nextProgress });
+      },
+
+      updateFileDownloaderProgress: (fileId, deviceId, progress) => {
+        const { fileDownloaderProgress } = get();
+        const byFile = fileDownloaderProgress[fileId] || {};
+        set({
+          fileDownloaderProgress: {
+            ...fileDownloaderProgress,
+            [fileId]: { ...byFile, [deviceId]: Math.min(100, Math.max(0, progress)) },
           },
         });
       },

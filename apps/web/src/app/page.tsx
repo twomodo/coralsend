@@ -1,141 +1,100 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useStore } from '@/store/store';
-import { getDeviceId } from '@/lib/deviceId';
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
-import { HomeView } from '@/components/views/HomeView';
+import { WelcomeView } from '@/components/welcome/WelcomeView';
+import { getSiteUrl } from '@/lib/site';
 
-// Generate room code
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+export const metadata: Metadata = {
+  title: 'CoralSend - Fast Private File Transfer',
+  description:
+    'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'CoralSend - Fast Private File Transfer',
+    description:
+      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+    url: '/',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CoralSend - Fast Private File Transfer',
+    description:
+      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+  },
+};
+
+type PageSearchParams = {
+  room?: string | string[];
+  'share-target'?: string | string[];
+};
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
 }
 
-export default function Home() {
-  const router = useRouter();
-  const deviceId = useStore((s) => s.deviceId);
+export default async function WelcomePage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
+  const params = await searchParams;
+  const roomParam = firstParam(params.room);
+  const shareTarget = firstParam(params['share-target']);
 
-  // Initialize device ID on mount and clear any old errors
-  useEffect(() => {
-    const store = useStore.getState();
-    if (!deviceId) {
-      store.setDeviceId(getDeviceId());
+  if (roomParam) {
+    const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
+    if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
+      redirect(`/room/${roomId}`);
     }
-    // Clear any previous connection errors when returning to home
-    store.setError(null);
-    store.setStatus('idle');
-  }, [deviceId]);
+  }
 
-  // Handle room parameter in URL on mount (for old links)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const roomParam = params.get('room');
+  if (shareTarget === '1') {
+    redirect('/app?share-target=1');
+  }
 
-      if (roomParam) {
-        // Redirect to new route format
-        const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
-        if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
-          router.replace(`/room/${roomId}`);
-        }
-      }
-    }
-  }, [router]);
-
-  // Handle PWA share_target: read shared files from cache and store as pending
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('caches' in window)) return;
-    const params = new URLSearchParams(window.location.search);
-    const shareTarget = params.get('share-target');
-    if (shareTarget !== '1') return;
-
-    const SHARE_CACHE = 'coralsend-share-target';
-    (async () => {
-      try {
-        const cache = await caches.open(SHARE_CACHE);
-        const countRes = await cache.match('count');
-        const count = countRes ? parseInt(await countRes.text(), 10) : 0;
-        const files: File[] = [];
-        for (let i = 0; i < count; i++) {
-          const res = await cache.match(`file-${i}`);
-          if (!res) continue;
-          const blob = await res.blob();
-          const name = res.headers.get('X-Shared-Filename') || `shared-${i}`;
-          files.push(new File([blob], name, { type: blob.type || 'application/octet-stream' }));
-          await cache.delete(`file-${i}`);
-        }
-        await cache.delete('count');
-        if (files.length > 0) {
-          useStore.getState().setPendingShareFiles(files);
-        }
-      } catch (err) {
-        console.error('[CoralSend] Failed to read shared files from cache:', err);
-      }
-      // Clean URL so refresh doesn't re-run
-      const path = window.location.pathname + window.location.hash || '';
-      window.history.replaceState({}, '', path);
-    })();
-  }, []);
-
-  // Create new room
-  const createRoom = () => {
-    const roomId = generateRoomCode();
-    // Navigate directly with create flag
-    router.push(`/room/${roomId}?create=true`);
+  const siteUrl = getSiteUrl();
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'CoralSend',
+    url: siteUrl,
+    description:
+      'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
   };
 
-  // Join existing room
-  const joinRoom = (roomIdOrUrl: string) => {
-    let roomId = extractRoomId(roomIdOrUrl) || roomIdOrUrl.toUpperCase();
-
-    // Validate room code (6 alphanumeric characters)
-    if (!/^[A-Z0-9]{6}$/.test(roomId) && !isValidUUID(roomId)) {
-      useStore.getState().setError('Invalid room code format');
-      return;
-    }
-
-    // Navigate to room route - the RoomPage will handle the connection
-    router.push(`/room/${roomId}`);
+  const appJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'CoralSend',
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Web',
+    url: siteUrl,
+    description:
+      'Create a room, share the link, and send files straight to another device over encrypted WebRTC channels.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
   };
-
-  // Paste link from clipboard
-  const pasteLink = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      joinRoom(text);
-    } catch (err) {
-      console.error('Clipboard error:', err);
-      useStore.getState().setError('Unable to read clipboard');
-    }
-  };
-
-  // ============ RENDER ============
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      {/* Background pattern */}
-      <div className="fixed inset-0 opacity-30">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(20, 184, 166, 0.15) 0%, transparent 50%),
-                             radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%)`,
-          }}
-        />
-      </div>
-
+    <main className="page-shell overflow-auto">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+      />
+      <div className="page-glow" />
       <div className="relative z-10">
-        <HomeView
-          onCreateRoom={createRoom}
-          onJoinRoom={joinRoom}
-          onPasteLink={pasteLink}
-        />
+        <WelcomeView />
       </div>
     </main>
   );

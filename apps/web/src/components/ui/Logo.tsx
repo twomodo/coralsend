@@ -12,19 +12,16 @@ interface LogoProps {
 
 export function Logo({ size = 'md', showText = true, className }: LogoProps) {
   const sizeMap = {
-    sm: { icon: 32, text: 'text-xl' },
-    md: { icon: 48, text: 'text-3xl' },
-    lg: { icon: 64, text: 'text-5xl' },
+    sm: { icon: 32, text: 'text-xl', iconClass: 'w-8 h-8' },
+    md: { icon: 48, text: 'text-3xl', iconClass: 'w-12 h-12' },
+    lg: { icon: 64, text: 'text-5xl', iconClass: 'w-16 h-16' },
   };
 
-  const { icon, text } = sizeMap[size];
+  const { icon, text, iconClass } = sizeMap[size];
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <div
-        className="relative shrink-0"
-        style={{ width: icon, height: icon }}
-      >
+      <div className={cn('relative shrink-0', iconClass)}>
         <Image
           src={ASSETS.logo}
           alt="CoralSend"

@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
+import pkg from './package.json';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Support subdirectory deployment via environment variable
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
-  // Ensure assetPrefix matches basePath
   assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || pkg.version,
+  },
 };
 
 export default nextConfig;

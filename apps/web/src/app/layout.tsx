@@ -1,12 +1,30 @@
 import type { Metadata, Viewport } from 'next';
 import { ASSETS } from '@/lib/constants';
+import { getSiteUrl } from '@/lib/site';
 import { PWAProvider } from '@/components/PWAProvider';
 import './globals.css';
 
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: 'CoralSend - Secure P2P File Transfer',
   description: 'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
   keywords: ['file transfer', 'p2p', 'secure', 'encrypted', 'file sharing', 'webrtc'],
+  alternates: {
+    canonical: '/',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   authors: [{ name: 'CoralSend' }],
   creator: 'CoralSend',
   manifest: ASSETS.manifest,
@@ -20,6 +38,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
+    url: '/',
     title: 'CoralSend - Secure P2P File Transfer',
     description: 'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
     siteName: 'CoralSend',
@@ -52,7 +71,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('coralsend_theme');if(t==='light'){document.documentElement.classList.add('light');}else if(t==='dark'){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
       <body className="font-sans antialiased">
         <PWAProvider>{children}</PWAProvider>
       </body>

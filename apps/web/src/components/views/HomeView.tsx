@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { useStore } from '@/store/store';
 import { getShortName } from '@/lib/deviceId';
 import {
@@ -9,15 +10,20 @@ import {
   Card,
   QRScanner,
   RoomHistory,
+  CreateRoomButton,
+  SocialLinks,
+  ThemeToggle,
 } from '@/components/ui';
+import { APP_VERSION } from '@/lib/constants';
 import {
-  Plus,
   QrCode,
   ClipboardPaste,
   AlertCircle,
   X,
   ArrowLeft,
   User,
+  BookOpen,
+  Rocket,
 } from 'lucide-react';
 
 interface HomeViewProps {
@@ -33,39 +39,53 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
   const pendingShareFiles = useStore((s) => s.pendingShareFiles);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  // Handle connection errors
-  useEffect(() => {
-    if (error) {
-      setLinkError(error);
-      useStore.getState().setError(null);
-    }
-  }, [error]);
-
   const handleJoinRoom = (roomIdOrUrl: string) => {
     setShowScanner(false);
     onJoinRoom(roomIdOrUrl);
   };
 
+  const visibleError = linkError || error;
+
   return (
     <div className="h-screen flex flex-col animate-in fade-in duration-300">
       {/* Header */}
       <header className="flex-shrink-0 p-3 sm:p-4">
-        <div className="max-w-md mx-auto flex items-center justify-end">
-          {deviceId && (
-            <div className="flex items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-full py-1 pl-2.5 pr-3">
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
-                  My Device
-                </span>
-                <span className="text-xs font-semibold text-slate-200">
-                  {getShortName(deviceId)}
-                </span>
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-xs sm:text-sm"
+              aria-label="Home"
+            >
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+            <Link
+              href="/guide"
+              className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-xs sm:text-sm"
+              aria-label="Getting Started guide"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Guide</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {deviceId && (
+              <div className="flex items-center gap-2 glass border border-[var(--border-soft)] rounded-full py-1 pl-2.5 pr-3">
+                <div className="flex flex-col items-start leading-tight">
+                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-bold">
+                    My Device
+                  </span>
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    {getShortName(deviceId)}
+                  </span>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-teal-400" />
+                </div>
               </div>
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
-                <User className="w-3.5 h-3.5 text-teal-400" />
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
@@ -75,18 +95,23 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
           {/* Logo and tagline */}
           <div className="text-center space-y-2">
             <Logo size="md" className="justify-center" />
-            <p className="text-slate-400 text-sm sm:text-base">Multi-Peer File Sharing</p>
+            <p className="text-[var(--text-muted)] text-sm sm:text-base">Multi-Peer File Sharing</p>
           </div>
 
           {/* Error message */}
-          {linkError && (
+          {visibleError && (
             <Card variant="bordered" className="border-red-500/30 bg-red-500/5">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-red-400 text-sm">{linkError}</p>
+                  <p className="text-red-400 text-sm">{visibleError}</p>
                 </div>
-                <button onClick={() => setLinkError(null)}>
+                <button
+                  onClick={() => {
+                    setLinkError(null);
+                    useStore.getState().setError(null);
+                  }}
+                >
                   <X className="w-4 h-4 text-red-400" />
                 </button>
               </div>
@@ -118,10 +143,10 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-700" />
+                  <div className="w-full border-t border-[var(--border-soft)]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-slate-900 px-4 text-sm text-slate-500">or</span>
+                  <span className="bg-[var(--bg-base)] px-4 text-sm text-[var(--text-muted)]">or</span>
                 </div>
               </div>
 
@@ -133,36 +158,36 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
           ) : (
             /* Main actions */
             <div className="space-y-3 animate-in fade-in slide-in-from-left duration-200">
-              {/* Create Room */}
-              <button
-                onClick={onCreateRoom}
-                className="w-full group relative bg-gradient-to-r from-teal-500/10 to-cyan-500/10 border border-teal-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:border-teal-400/50 hover:from-teal-500/20 hover:to-cyan-500/20 transition-all"
-              >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/25 group-hover:scale-110 transition-transform">
-                    <Plus className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <CreateRoomButton onClick={onCreateRoom} />
+
+              {/* Getting Started */}
+              <Link href="/guide" className="block w-full group">
+                <Card variant="bordered" className="p-4 sm:p-5 hover:border-teal-500/30 transition-all">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">Getting Started</h3>
+                      <p className="text-[var(--text-muted)] text-xs sm:text-sm">Step-by-step guide to share files</p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold text-white">Create Room</h3>
-                    <p className="text-slate-400 text-xs sm:text-sm">Start a new sharing session</p>
-                  </div>
-                </div>
-              </button>
+                </Card>
+              </Link>
 
               {/* Join Room */}
-              <button
-                onClick={() => setShowScanner(true)}
-                className="w-full group relative bg-slate-800/50 border border-slate-700 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:border-slate-600 hover:bg-slate-800/80 transition-all"
-              >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-700 rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-cyan-400" />
+              <button onClick={() => setShowScanner(true)} className="w-full group">
+                <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--border-soft)] transition-all">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-cyan-400" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">Join Room</h3>
+                      <p className="text-[var(--text-muted)] text-xs sm:text-sm">Scan QR code or enter code</p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold text-white">Join Room</h3>
-                    <p className="text-slate-400 text-xs sm:text-sm">Scan QR code or enter code</p>
-                  </div>
-                </div>
+                </Card>
               </button>
 
               {/* Room History */}
@@ -173,8 +198,15 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
       </div>
 
       {/* Footer */}
-      <footer className="flex-shrink-0 py-2 text-center text-slate-500 text-[10px] sm:text-xs">
+      <footer className="flex-shrink-0 py-3 px-4 flex flex-col items-center gap-2 text-[var(--text-muted)] text-[10px] sm:text-xs">
         <p>Files are transferred directly between devices</p>
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <span>v{APP_VERSION}</span>
+          <Link href="/guide" className="hover:text-teal-400 transition-colors">
+            Guide
+          </Link>
+          <SocialLinks iconSize={16} />
+        </div>
       </footer>
     </div>
   );
