@@ -1,9 +1,9 @@
 .DS_Store
 
-# Environment variables
+# Environment variables (ignore all except .env.example and .env.*.example)
 .env
-.env.production
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 apps/server/server
 deploy/docker-containers
