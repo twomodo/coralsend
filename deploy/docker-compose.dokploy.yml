@@ -6,14 +6,14 @@ services:
       dockerfile: deploy/Dockerfile.server
     image: ${SERVER_IMAGE:-ghcr.io/alifakhimi/coralsend-server:dokploy}
     expose:
-      - "8080"
+      - "${SERVER_PORT:-8080}"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${SERVER_PORT:-8080}/health"]
+      interval: ${SERVER_HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${SERVER_HEALTHCHECK_TIMEOUT:-5s}
+      retries: ${SERVER_HEALTHCHECK_RETRIES:-5}
+      start_period: ${SERVER_HEALTHCHECK_START_PERIOD:-10s}
 
   # Next.js app (mapped from Domains tab: / -> port 3000)
   web:
@@ -21,14 +21,14 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.web
       args:
-        NEXT_PUBLIC_SIGNALING_URL: ${NEXT_PUBLIC_SIGNALING_URL:-wss://coralsend.612.ir/ws}
+        NEXT_PUBLIC_SIGNALING_URL: ${NEXT_PUBLIC_SIGNALING_URL}
         NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
         NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
-        NEXT_PUBLIC_STUN_URL: ${NEXT_PUBLIC_STUN_URL:-stun:turn.coralsend.612.ir:3478}
-        NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL:-turn:turn.coralsend.612.ir:3478?transport=udp}
-        NEXT_PUBLIC_TURN_USER: ${NEXT_PUBLIC_TURN_USER:-coralsend_prod}
-        NEXT_PUBLIC_TURN_PASS: ${NEXT_PUBLIC_TURN_PASS:-change-this-turn-password}
+        NEXT_PUBLIC_STUN_URL: ${NEXT_PUBLIC_STUN_URL}
+        NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL}
+        NEXT_PUBLIC_TURN_USER: ${NEXT_PUBLIC_TURN_USER}
+        NEXT_PUBLIC_TURN_PASS: ${NEXT_PUBLIC_TURN_PASS}
         NEXT_PUBLIC_ICE_DIAGNOSTICS: ${NEXT_PUBLIC_ICE_DIAGNOSTICS:-false}
         NEXT_PUBLIC_GITHUB_URL: ${NEXT_PUBLIC_GITHUB_URL:-}
         NEXT_PUBLIC_TWITTER_URL: ${NEXT_PUBLIC_TWITTER_URL:-}
@@ -37,10 +37,10 @@ services:
         NEXT_PUBLIC_LINKEDIN_URL: ${NEXT_PUBLIC_LINKEDIN_URL:-}
     image: ${WEB_IMAGE:-ghcr.io/alifakhimi/coralsend-web:dokploy}
     environment:
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
+      PORT: "${WEB_PORT:-3000}"
+      HOSTNAME: "${WEB_HOSTNAME:-0.0.0.0}"
     expose:
-      - "3000"
+      - "${WEB_PORT:-3000}"
     depends_on:
       server:
         condition: service_healthy
@@ -50,25 +50,25 @@ services:
   # Do NOT route this service via Domains tab/HTTPS reverse proxy.
   # It must be reachable directly on UDP/TCP ports.
   coturn:
-    image: coturn/coturn:4.6.3
+    image: ${COTURN_IMAGE:-coturn/coturn:4.8.0}
     command:
       - -n
       - --log-file=stdout
-      - --listening-ip=0.0.0.0
-      - --listening-port=3478
-      - --min-port=49160
-      - --max-port=49200
-      - --realm=${TURN_REALM:-turn.coralsend.612.ir}
+      - --listening-ip=${COTURN_LISTENING_IP:-0.0.0.0}
+      - --listening-port=${COTURN_LISTENING_PORT:-3478}
+      - --min-port=${COTURN_MIN_PORT:-49160}
+      - --max-port=${COTURN_MAX_PORT:-49200}
+      - --realm=${TURN_REALM}
       - --lt-cred-mech
-      - --user=${TURN_USER:-coralsend_prod}:${TURN_PASSWORD:-change-this-turn-password}
-      - --external-ip=${TURN_EXTERNAL_IP:-109.199.112.84}
+      - --user=${TURN_USER}:${TURN_PASSWORD}
+      - --external-ip=${TURN_EXTERNAL_IP}
       - --fingerprint
       - --no-tls
       - --no-dtls
       - --no-cli
     ports:
-      - "3478:3478/udp"
-      - "3478:3478/tcp"
-      - "49160-49200:49160-49200/udp"
-      - "49160-49200:49160-49200/tcp"
+      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/udp"
+      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/tcp"
+      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/udp"
+      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/tcp"
     restart: unless-stopped
