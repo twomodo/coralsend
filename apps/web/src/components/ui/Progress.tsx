@@ -26,13 +26,7 @@ export function Progress({ value, size = 'md', showLabel = true, className }: Pr
           style={{ width: `${clampedValue}%` }}
         >
           {/* Animated shine effect */}
-          <div 
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]"
-            style={{ 
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 2s infinite linear',
-            }}
-          />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer [background-size:200%_100%]" />
         </div>
       </div>
       {showLabel && (

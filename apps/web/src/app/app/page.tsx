@@ -21,14 +21,8 @@ export default function AppHomePage() {
   }, [joinRoom]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      <div
-        className="fixed inset-0 opacity-30"
-        style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, rgba(20, 184, 166, 0.15) 0%, transparent 50%),
-                           radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%)`,
-        }}
-      />
+    <main className="page-shell overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
+      <div className="page-glow" />
       <div className="relative z-10">
         <HomeView
           onCreateRoom={createRoomAndNavigate}

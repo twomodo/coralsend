@@ -167,12 +167,14 @@ export const useWebRTC = () => {
   const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
-  const sendAbortController = useRef<AbortController | null>(null);
+  const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
+  const lastProgressReported = useRef<Map<string, number>>(new Map()); // fileId -> last % sent to sender
 
   // ============ Cleanup ============
 
   const cleanup = useCallback(() => {
-    sendAbortController.current?.abort();
+    sendAbortControllers.current.forEach((ac) => ac.abort());
+    sendAbortControllers.current.clear();
 
     // Close all data channels
     dataChannels.current.forEach((dc) => dc.close());
@@ -196,6 +198,7 @@ export const useWebRTC = () => {
     pendingFiles.current.clear();
     receivedFileBlobs.current.clear();
     requestModes.current.clear();
+    lastProgressReported.current.clear();
 
     useStore.getState().reset();
   }, []);
@@ -284,10 +287,38 @@ export const useWebRTC = () => {
           const incoming = incomingChunks.current.get(fileId);
 
           if (incoming) {
+            // Ensure sender's avatar shows 100% before we remove downloader
+            const dc = dataChannels.current.get(senderDeviceId);
+            if (dc?.readyState === 'open') {
+              dc.send(JSON.stringify({ type: 'file-progress', fileId, progress: 100 }));
+            }
             console.log('File transfer complete:', incoming.meta.name);
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
             incomingChunks.current.delete(fileId);
+            lastProgressReported.current.delete(fileId);
+          }
+        } else if (msg.type === 'file-progress') {
+          // Receiver reports progress back to sender (for avatar display)
+          const { fileId: fid, progress: pct } = msg as { fileId: string; progress: number };
+          if (typeof fid === 'string' && typeof pct === 'number') {
+            store.updateFileDownloaderProgress(fid, senderDeviceId, Math.min(100, Math.max(0, pct)));
+            // Only remove downloader when receiver has actually received 100% (not when sender's buffer is done)
+            if (pct >= 100) {
+              store.removeFileDownloader(fid, senderDeviceId);
+            }
+          }
+        } else if (msg.type === 'file-cancel') {
+          // Receiver cancelled download - abort send to that requester
+          const { fileId: fid } = msg as { fileId: string };
+          if (typeof fid === 'string') {
+            const key = `${fid}-${senderDeviceId}`;
+            const ac = sendAbortControllers.current.get(key);
+            if (ac) {
+              ac.abort();
+              sendAbortControllers.current.delete(key);
+            }
+            store.removeFileDownloader(fid, senderDeviceId);
           }
         }
       } catch (e) {
@@ -310,6 +341,16 @@ export const useWebRTC = () => {
         const received = incoming.chunks.reduce((acc, c) => acc + c.byteLength, 0);
         const progress = Math.min(100, Math.round((received / incoming.meta.size) * 100));
         store.updateFileProgress(fileId, progress);
+
+        // Report progress back to sender so avatar matches actual receiver progress (throttle to ~5% steps)
+        const last = lastProgressReported.current.get(fileId) ?? -1;
+        if (progress >= 100 || progress - last >= 5) {
+          lastProgressReported.current.set(fileId, progress);
+          const dc = dataChannels.current.get(senderDeviceId);
+          if (dc?.readyState === 'open') {
+            dc.send(JSON.stringify({ type: 'file-progress', fileId, progress }));
+          }
+        }
       } else {
         console.warn('Received chunk for unknown fileId:', fileId);
       }
@@ -771,6 +812,8 @@ export const useWebRTC = () => {
           const { fileId, requesterId } = msg.payload as { fileId: string; requesterId: string };
           const file = pendingFiles.current.get(fileId);
           if (file) {
+            const requester = store.currentRoom?.members.find(m => m.deviceId === requesterId);
+            store.addFileDownloader(fileId, requesterId, requester?.displayName ?? requesterId.slice(0, 8));
             sendFileToOne(file, fileId, requesterId);
           }
           break;
@@ -902,6 +945,25 @@ export const useWebRTC = () => {
     console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
   }, []);
 
+  // Cancel an in-progress download (receiver-initiated)
+  const cancelFileDownload = useCallback((fileId: string) => {
+    const store = useStore.getState();
+    const file = store.currentRoom?.files.find((f) => f.id === fileId);
+    if (!file || file.status !== 'downloading') return;
+
+    const uploaderId = file.uploaderId;
+    const dc = dataChannels.current.get(uploaderId);
+    if (dc?.readyState === 'open') {
+      dc.send(JSON.stringify({ type: 'file-cancel', fileId }));
+    }
+
+    incomingChunks.current.delete(fileId);
+    lastProgressReported.current.delete(fileId);
+    requestModes.current.delete(fileId);
+    store.updateFileStatus(fileId, 'available');
+    store.updateFileProgress(fileId, 0);
+  }, []);
+
   // Request a file, with preferred completion mode for text files.
   const requestFile = useCallback((file: FileMetadata, mode: 'download' | 'copy' = 'download') => {
     const store = useStore.getState();
@@ -935,7 +997,11 @@ export const useWebRTC = () => {
     }
 
     const store = useStore.getState();
-    sendAbortController.current = new AbortController();
+    const abortKey = `${fileId}-${targetDeviceId}`;
+    const ac = new AbortController();
+    sendAbortControllers.current.set(abortKey, ac);
+    store.updateFileDownloaderProgress(fileId, targetDeviceId, 0);
+    let completed = false; // true when receiver will send file-progress 100%
 
     try {
       // Send start message
@@ -954,6 +1020,7 @@ export const useWebRTC = () => {
 
       // Read and send chunks
       const buffer = await file.arrayBuffer();
+      const totalBytes = buffer.byteLength;
       let offset = 0;
       const encoder = new TextEncoder();
       const fileIdBytes = encoder.encode(fileId.padEnd(36, ' '));
@@ -963,7 +1030,7 @@ export const useWebRTC = () => {
           const send = () => {
             try {
               while (offset < buffer.byteLength) {
-                if (sendAbortController.current?.signal.aborted) {
+                if (ac.signal.aborted) {
                   reject(new Error('Cancelled'));
                   return;
                 }
@@ -986,6 +1053,7 @@ export const useWebRTC = () => {
 
                 dc.send(combined.buffer);
                 offset = end;
+                // Progress is reported by receiver via file-progress messages (avatar matches actual download)
               }
               resolve();
             } catch (err) {
@@ -998,14 +1066,21 @@ export const useWebRTC = () => {
 
       await sendChunk();
 
-      // Send end message
+      // Send end message (receiver will send file-progress 100% when done, then we remove downloader)
       dc.send(JSON.stringify({ type: 'file-end', fileId }));
+      completed = true;
       console.log('File sent to', targetDeviceId);
 
     } catch (err) {
-      console.error('Send error:', err);
+      if ((err as Error).message !== 'Cancelled') {
+        console.error('Send error:', err);
+      }
     } finally {
-      sendAbortController.current = null;
+      sendAbortControllers.current.delete(abortKey);
+      // Only remove on error/cancel: on success, receiver will send file-progress 100% and we remove there
+      if (!completed) {
+        useStore.getState().removeFileDownloader(fileId, targetDeviceId);
+      }
     }
   }, []);
 
@@ -1144,6 +1219,7 @@ export const useWebRTC = () => {
     connect,
     shareFile,
     requestFile,
+    cancelFileDownload,
     sendChat,
     cleanup,
     retryConnection,

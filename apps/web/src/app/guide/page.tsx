@@ -55,16 +55,8 @@ export default function GuidePage() {
   const inRoom = currentRoom && guideRoomId && currentRoom.id === guideRoomId;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-auto">
-      <div className="fixed inset-0 opacity-30 pointer-events-none">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(20, 184, 166, 0.15) 0%, transparent 50%),
-                             radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%)`,
-          }}
-        />
-      </div>
+    <main className="page-shell overflow-auto">
+      <div className="page-glow" />
 
       <div className="relative z-10 min-h-screen flex flex-col max-w-md mx-auto px-4 py-6">
         <header className="flex items-center justify-between mb-6">

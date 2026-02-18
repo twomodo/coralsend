@@ -46,7 +46,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-[var(--text-muted)]">
           <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Recent Rooms</span>
         </div>
@@ -55,7 +55,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
             variant="ghost"
             size="sm"
             onClick={() => setShowConfirm(true)}
-            className="text-slate-500 hover:text-red-400"
+            className="text-[var(--text-muted)] hover:text-red-400"
           >
             <Trash2 className="w-3 h-3" />
             Clear
@@ -65,8 +65,8 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
 
       {/* Confirm clear dialog */}
       {showConfirm && (
-        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 space-y-2">
-          <p className="text-sm text-white">Clear all room history?</p>
+        <div className="glass rounded-lg p-3 border border-[var(--border-soft)] space-y-2">
+          <p className="text-sm text-[var(--text-primary)]">Clear all room history?</p>
           <div className="flex gap-2">
             <Button
               variant="secondary"
@@ -95,23 +95,23 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
         {roomHistory.slice(0, 2).map((room) => (
           <div
             key={room.id}
-            className="group flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700/50 cursor-pointer transition-all"
+            className="group flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 glass hover:bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl border border-[var(--border-soft)] cursor-pointer transition-all"
             onClick={() => onRejoin(room.id)}
           >
             {/* Room icon */}
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-700/50 rounded-md sm:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold text-teal-400">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[var(--surface-glass-strong)] rounded-md sm:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold text-teal-400">
               {room.id.slice(0, 2)}
             </div>
 
             {/* Room info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-mono font-semibold text-white text-sm sm:text-base">{room.id}</span>
+                <span className="font-mono font-semibold text-[var(--text-primary)] text-sm sm:text-base">{room.id}</span>
                 {room.name && (
-                  <span className="text-xs text-slate-400 truncate">({room.name})</span>
+                  <span className="text-xs text-[var(--text-muted)] truncate">({room.name})</span>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-[10px] sm:text-xs text-[var(--text-muted)]">
                 <span className="flex items-center gap-0.5 sm:gap-1">
                   <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   {formatDate(room.joinedAt)}
@@ -130,11 +130,11 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
                   e.stopPropagation();
                   removeFromHistory(room.id);
                 }}
-                className="p-1 sm:p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                className="p-1 sm:p-1.5 text-[var(--text-muted)] hover:text-red-400 transition-colors"
               >
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--text-muted)]" />
             </div>
           </div>
         ))}

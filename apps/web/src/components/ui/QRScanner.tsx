@@ -121,9 +121,6 @@ export function QRScanner({ onScan, onError, className }: QRScannerProps) {
               {/* Scanning line animation */}
               <div 
                 className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-teal-400 to-transparent animate-[scan_2s_ease-in-out_infinite]"
-                style={{
-                  animation: 'scan 2s ease-in-out infinite',
-                }}
               />
             </div>
           </div>

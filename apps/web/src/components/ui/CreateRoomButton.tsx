@@ -23,8 +23,8 @@ export function CreateRoomButton({ onClick, className }: CreateRoomButtonProps) 
           <Plus className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
         </div>
         <div className="text-left">
-          <h3 className="text-lg sm:text-xl font-semibold text-white">Create Room</h3>
-          <p className="text-slate-400 text-xs sm:text-sm">Start a new sharing session</p>
+          <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">Create Room</h3>
+          <p className="text-[var(--text-muted)] text-xs sm:text-sm">Start a new sharing session</p>
         </div>
       </div>
     </button>
