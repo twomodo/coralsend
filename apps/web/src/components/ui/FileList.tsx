@@ -34,11 +34,13 @@ const fileTypeCategories = [
   { id: 'image', label: 'Images', icon: Image, match: (t: string) => t.startsWith('image/') },
   { id: 'video', label: 'Videos', icon: FileVideo, match: (t: string) => t.startsWith('video/') },
   { id: 'audio', label: 'Audio', icon: FileAudio, match: (t: string) => t.startsWith('audio/') },
-  { id: 'document', label: 'Documents', icon: FileText, match: (t: string) => 
-    t.includes('pdf') || t.includes('document') || t.includes('text') || t.includes('spreadsheet') || t.includes('presentation')
+  {
+    id: 'document', label: 'Documents', icon: FileText, match: (t: string) =>
+      t.includes('pdf') || t.includes('document') || t.includes('text') || t.includes('spreadsheet') || t.includes('presentation')
   },
-  { id: 'archive', label: 'Archives', icon: Archive, match: (t: string) => 
-    t.includes('zip') || t.includes('rar') || t.includes('tar') || t.includes('gzip')
+  {
+    id: 'archive', label: 'Archives', icon: Archive, match: (t: string) =>
+      t.includes('zip') || t.includes('rar') || t.includes('tar') || t.includes('gzip')
   },
 ];
 
@@ -112,7 +114,7 @@ function FileItem({ file, onDownload, onCopyTextFile }: FileItemProps) {
               <Progress value={file.progress} size="sm" />
             </div>
           )}
-          
+
           {/* Error message */}
           {isError && (
             <div className="mt-1 text-xs text-red-400">
@@ -158,7 +160,7 @@ function FileItem({ file, onDownload, onCopyTextFile }: FileItemProps) {
               </Button>
             </div>
           )}
-          
+
           {/* Downloading indicator */}
           {isDownloading && (
             <div className="flex items-center gap-1 sm:gap-2 text-cyan-400 text-xs sm:text-sm px-2 py-1">
@@ -233,17 +235,19 @@ interface FileListProps {
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
   className?: string;
   hideHeader?: boolean;
+  /** When true, filters row (Pending/Done, Type, Sort) is hidden; code kept for later */
+  hideFilters?: boolean;
 }
 
-export function FileList({ direction, onDownload, onCopyTextFile, className, hideHeader }: FileListProps) {
+export function FileList({ direction, onDownload, onCopyTextFile, className, hideHeader, hideFilters }: FileListProps) {
   const allFiles = useStore((s) => s.currentRoom?.files);
   const members = useStore((s) => s.currentRoom?.members);
-  
+
   // Filter files by direction using useMemo to avoid creating new arrays on every render
-  const files = useMemo(() => 
+  const files = useMemo(() =>
     allFiles?.filter(f => f.direction === direction) || []
-  , [allFiles, direction]);
-  
+    , [allFiles, direction]);
+
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -326,8 +330,8 @@ export function FileList({ direction, onDownload, onCopyTextFile, className, hid
         </div>
       )}
 
-      {/* Filters */}
-      {files.length > 0 && (
+      {/* Filters (hidden when hideFilters=true, e.g. Outbox; code kept for later) */}
+      {!hideFilters && files.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Status filter */}
           <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">

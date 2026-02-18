@@ -68,7 +68,8 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
           <FileList
             direction="outbox"
             hideHeader
-            onDownload={() => {}}
+            hideFilters
+            onDownload={() => { }}
             onCopyTextFile={async () => false}
           />
         </div>
