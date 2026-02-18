@@ -25,8 +25,8 @@ export function GuideStepper({ currentStep, className }: GuideStepperProps) {
               className={cn(
                 'flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium transition-colors',
                 isActive && 'bg-teal-500 text-white',
-                isPast && 'bg-teal-500/30 text-teal-300',
-                !isActive && !isPast && 'bg-slate-700 text-slate-500'
+                isPast && 'bg-teal-100 text-teal-700 dark:bg-teal-500/30 dark:text-teal-300',
+                !isActive && !isPast && 'bg-slate-500/20 text-[var(--text-muted)] border border-[var(--border-soft)]'
               )}
               aria-current={isActive ? 'step' : undefined}
             >
@@ -36,7 +36,7 @@ export function GuideStepper({ currentStep, className }: GuideStepperProps) {
               <div
                 className={cn(
                   'w-8 h-0.5 mx-0.5',
-                  isPast ? 'bg-teal-500/50' : 'bg-slate-700'
+                  isPast ? 'bg-teal-500/50' : 'bg-[var(--border-soft)]'
                 )}
               />
             )}

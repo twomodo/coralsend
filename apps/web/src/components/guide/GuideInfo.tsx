@@ -32,9 +32,9 @@ const FEATURES = [
 
 export function GuideInfo() {
   return (
-    <div className="mt-12 pt-8 border-t border-slate-800 space-y-10">
+    <div className="mt-12 pt-8 border-t border-[var(--border-soft)] space-y-10">
       <section id="features">
-        <h3 className="text-lg font-semibold text-white mb-4">Features</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Features</h3>
         <ul className="space-y-3">
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <li key={title} className="flex gap-3">
@@ -42,8 +42,8 @@ export function GuideInfo() {
                 <Icon className="w-4 h-4 text-teal-400" />
               </div>
               <div>
-                <p className="font-medium text-white text-sm">{title}</p>
-                <p className="text-slate-400 text-xs">{description}</p>
+                <p className="font-medium text-[var(--text-primary)] text-sm">{title}</p>
+                <p className="text-[var(--text-muted)] text-xs">{description}</p>
               </div>
             </li>
           ))}
@@ -51,8 +51,8 @@ export function GuideInfo() {
       </section>
 
       <section id="concept">
-        <h3 className="text-lg font-semibold text-white mb-4">How it works</h3>
-        <p className="text-slate-400 text-sm leading-relaxed">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">How it works</h3>
+        <p className="text-[var(--text-muted)] text-sm leading-relaxed">
           CoralSend uses a signaling server only to help your browser connect to the other person&apos;s browser. Room IDs and connection metadata pass through the server; file bytes never do. Once the WebRTC data channel is open, files are sent directly between devices and are encrypted in transit (DTLS).
         </p>
       </section>

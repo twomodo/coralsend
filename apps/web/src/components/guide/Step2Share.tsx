@@ -51,8 +51,8 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-semibold text-white">Share the link</h2>
-        <p className="text-slate-400 text-sm max-w-sm mx-auto">
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Share the link</h2>
+        <p className="text-[var(--text-muted)] text-sm max-w-sm mx-auto">
           Send this link to the person who should receive your files. They can open it on their device or scan the QR code. When they join, you can continue.
         </p>
       </div>
@@ -63,7 +63,7 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
             <QRCodeSVG value={shareUrl} size={140} level="H" />
           </div>
           <div className="flex-1 space-y-3 w-full min-w-0">
-            <p className="text-sm text-slate-400">Room code</p>
+            <p className="text-sm text-[var(--text-muted)]">Room code</p>
             <p className="text-xl font-mono font-bold text-teal-400 break-all">{room.id}</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={copyLink}>
@@ -82,11 +82,11 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
       </Card>
 
       <Card variant="bordered" className="p-4">
-        <p className="text-sm text-slate-400 mb-2">People in this room</p>
+        <p className="text-sm text-[var(--text-muted)] mb-2">People in this room</p>
         <div className="flex items-center gap-2 flex-wrap">
           <MemberAvatarStack />
           {otherMembersCount === 0 ? (
-            <span className="text-slate-500 text-sm">Waiting for someone to join…</span>
+            <span className="text-[var(--text-muted)] text-sm">Waiting for someone to join…</span>
           ) : (
             <span className="text-teal-400 text-sm">{otherMembersCount} other member{otherMembersCount !== 1 ? 's' : ''} joined</span>
           )}
@@ -102,7 +102,7 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
         >
           Continue
         </Button>
-        <Button variant="ghost" size="sm" className="w-full text-slate-500" onClick={onSkipDemo}>
+        <Button variant="ghost" size="sm" className="w-full text-[var(--text-muted)]" onClick={onSkipDemo}>
           Skip for demo
         </Button>
       </div>

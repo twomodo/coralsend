@@ -30,16 +30,16 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-semibold text-white">Send a file</h2>
-        <p className="text-slate-400 text-sm max-w-sm mx-auto">
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Send a file</h2>
+        <p className="text-[var(--text-muted)] text-sm max-w-sm mx-auto">
           Choose a file to share. It goes directly to the other person&apos;s device—nothing is stored or uploaded to any server.
         </p>
       </div>
 
       <Card variant="bordered" className="p-4 flex items-start gap-3 border-teal-500/20 bg-teal-500/5">
         <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-        <div className="text-sm text-slate-300">
-          <p className="font-medium text-white mb-1">Private and secure</p>
+        <div className="text-sm text-[var(--text-primary)]">
+          <p className="font-medium text-[var(--text-primary)] mb-1">Private and secure</p>
           <p>Your file is never stored anywhere and is not uploaded to a server. It is sent directly between devices using encrypted P2P transfer.</p>
         </div>
       </Card>
@@ -49,8 +49,8 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Send className="w-5 h-5 text-teal-400" />
-              <h3 className="font-semibold text-white">Outbox</h3>
-              <span className="text-sm text-slate-500">({outboxCount})</span>
+              <h3 className="font-semibold text-[var(--text-primary)]">Outbox</h3>
+              <span className="text-sm text-[var(--text-muted)]">({outboxCount})</span>
             </div>
             <button
               type="button"
@@ -62,7 +62,7 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
               Add File
             </button>
           </div>
-          <p className="text-xs text-slate-500">Select a file to share with others in the room.</p>
+          <p className="text-xs text-[var(--text-muted)]">Select a file to share with others in the room.</p>
         </div>
         <div className="min-h-[120px] overflow-y-auto">
           <FileList
