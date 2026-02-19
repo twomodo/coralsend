@@ -9,7 +9,7 @@ dev:
 
 server:
 	@echo "Starting Signaling Server..."
-	@cd apps/server && go run cmd/server/main.go
+	@cd apps/server && [ -f .env ] && set -a && . ./.env && set +a; go run cmd/server/main.go -addr=:$${SERVER_PORT:-8080}
 
 web:
 	@echo "Starting Web PWA..."
