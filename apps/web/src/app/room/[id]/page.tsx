@@ -66,11 +66,12 @@ export default function RoomPage() {
     store.clearPendingShareFiles();
   }, [currentRoom?.id, normalizedRoomId, shareFile]);
 
-  // Leave room
+  // Leave room: navigate immediately, defer cleanup so the UI feels instant
   const leaveRoom = () => {
-    cleanup();
     useStore.getState().leaveRoom();
     router.push('/app');
+    // Defer network teardown so navigation isn't blocked
+    setTimeout(() => cleanup(), 0);
   };
 
   if (!currentRoom || currentRoom.id !== normalizedRoomId) {

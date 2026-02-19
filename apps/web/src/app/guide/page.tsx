@@ -32,14 +32,13 @@ export default function GuidePage() {
 
   const handleBack = () => {
     if (step === 1) {
-      router.push('/app');
+      router.back();
       return;
     }
     cleanup();
     useStore.getState().leaveRoom();
     setStep(1);
     setGuideRoomId(null);
-    router.push('/app');
   };
 
   const handleSkipDemo = () => {
