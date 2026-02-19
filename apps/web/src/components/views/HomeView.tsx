@@ -22,7 +22,7 @@ import {
   X,
   ArrowLeft,
   User,
-  BookOpen,
+  Home,
   Rocket,
 } from 'lucide-react';
 
@@ -51,23 +51,14 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
       {/* Header */}
       <header className="flex-shrink-0 p-3 sm:p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-xs sm:text-sm"
-              aria-label="Home"
-            >
-              <span className="hidden sm:inline">Home</span>
-            </Link>
-            <Link
-              href="/guide"
-              className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-xs sm:text-sm"
-              aria-label="Getting Started guide"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Guide</span>
-            </Link>
-          </div>
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-sm"
+            aria-label="Website Home"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden sm:inline">Website</span>
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {deviceId && (
@@ -202,8 +193,8 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
         <p>Files are transferred directly between devices</p>
         <div className="flex items-center gap-3 flex-wrap justify-center">
           <span>v{APP_VERSION}</span>
-          <Link href="/guide" className="hover:text-teal-400 transition-colors">
-            Guide
+          <Link href="/changelog" className="hover:text-teal-400 transition-colors">
+            Changelog
           </Link>
           <SocialLinks iconSize={16} />
         </div>

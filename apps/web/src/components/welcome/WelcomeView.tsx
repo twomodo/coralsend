@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { Logo } from '@/components/ui';
 import { WelcomeContent } from './WelcomeContent';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,18 @@ const secondaryBtn =
 export function WelcomeView() {
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-1 max-w-lg mx-auto w-full px-4 py-10 sm:py-14">
+      {/* Top nav */}
+      <nav className="flex justify-end px-4 pt-4 sm:pt-6 max-w-lg mx-auto w-full">
+        <Link
+          href="/app"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-teal-400 transition-colors"
+        >
+          Open App
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </nav>
+
+      <div className="flex-1 max-w-lg mx-auto w-full px-4 py-8 sm:py-12">
         {/* Hero */}
         <div className="text-center mb-12">
           <Logo size="lg" className="justify-center mb-4" />
