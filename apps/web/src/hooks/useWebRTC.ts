@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useStore, type Member, type FileMetadata, type ChatMessage } from '@/store/store';
+import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
 
@@ -292,6 +293,10 @@ export const useWebRTC = () => {
             if (dc?.readyState === 'open') {
               dc.send(JSON.stringify({ type: 'file-progress', fileId, progress: 100 }));
             }
+            analytics.track('file_downloaded', {
+              fileType: incoming.meta.type,
+              fileSize: incoming.meta.size,
+            });
             console.log('File transfer complete:', incoming.meta.name);
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
@@ -942,6 +947,7 @@ export const useWebRTC = () => {
       payload: meta,
     }));
 
+    analytics.track('file_shared', { fileType: file.type, fileSize: file.size });
     console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
   }, []);
 
