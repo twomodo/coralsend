@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/store';
+import { analytics } from '@/lib/analytics';
 import { getDeviceId } from '@/lib/deviceId';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 
@@ -17,9 +18,11 @@ export function useEnsureDevice() {
 
   useEffect(() => {
     const store = useStore.getState();
+    const id = deviceId ?? getDeviceId();
     if (!deviceId) {
-      store.setDeviceId(getDeviceId());
+      store.setDeviceId(id);
     }
+    analytics.identify(id);
     store.setError(null);
     store.setStatus('idle');
   }, [deviceId]);

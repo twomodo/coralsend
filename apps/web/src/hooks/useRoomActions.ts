@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/store';
+import { analytics } from '@/lib/analytics';
 import { generateRoomCode } from '@/lib/roomCode';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 
@@ -32,6 +33,7 @@ export function useRoomActions() {
    */
   const createRoomAndNavigate = useCallback(() => {
     const roomId = generateRoomCode();
+    analytics.track('room_created', { roomId });
     navigateToRoom(roomId, true);
   }, [navigateToRoom]);
 
@@ -48,6 +50,7 @@ export function useRoomActions() {
         return false;
       }
       const normalized = isValidUUID(roomId) ? roomId : roomId.toUpperCase();
+      analytics.track('room_joined', { roomId: normalized });
       navigateToRoom(normalized, false);
       return true;
     },
