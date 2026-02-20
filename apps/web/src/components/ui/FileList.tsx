@@ -112,7 +112,14 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
             )}
             <span className="hidden sm:inline">•</span>
             <div className="flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+              {isOutbox ? (
+                <CheckCircle
+                  className="w-3 h-3 text-teal-400"
+                  aria-label="File shared successfully"
+                />
+              ) : (
+                <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+              )}
               <span className="hidden sm:inline">{new Date(file.uploadedAt).toLocaleTimeString()}</span>
               <span className="sm:hidden">{new Date(file.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
