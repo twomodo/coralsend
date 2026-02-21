@@ -42,9 +42,10 @@ type ChatMessagePayload = {
 
 // ============ Constants ============
 
-const CHUNK_SIZE = 256 * 1024; // 256KB chunks
-const BUFFER_LOW_THRESHOLD = 256 * 1024; // 256KB
-const BUFFER_HIGH_THRESHOLD = 4 * 1024 * 1024; // 4MB
+const FILE_ID_HEADER = 36;
+const CHUNK_SIZE = 64 * 1024; // 64KB payload (+ 36B header stays well under 256KB maxMessageSize)
+const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
+const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
@@ -167,6 +168,7 @@ export const useWebRTC = () => {
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
   const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number }>>(new Map());
+  const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
   const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
@@ -279,7 +281,13 @@ export const useWebRTC = () => {
             }, meta.id);
           }
 
-          incomingChunks.current.set(meta.id, { meta, chunks: [], receivedBytes: 0, startTime: Date.now() });
+          const buffered = earlyChunks.current.get(meta.id);
+          const receivedBytes = buffered ? buffered.reduce((s, c) => s + c.byteLength, 0) : 0;
+          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now() });
+          earlyChunks.current.delete(meta.id);
+          if (buffered) {
+            logger.info('Transfer', `Flushed ${buffered.length} early chunks (${receivedBytes} bytes)`, meta.id);
+          }
           store.updateFileStatus(meta.id, 'downloading');
           store.updateFileProgress(meta.id, 0);
 
@@ -302,6 +310,7 @@ export const useWebRTC = () => {
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
             incomingChunks.current.delete(fileId);
+            earlyChunks.current.delete(fileId);
             lastProgressReported.current.delete(fileId);
           }
         } else if (msg.type === 'file-progress') {
@@ -335,11 +344,10 @@ export const useWebRTC = () => {
 
     // Binary data (file chunks) with fileId prefix
     if (data instanceof ArrayBuffer) {
-      // First 36 bytes are fileId (padded to 36 chars)
       const decoder = new TextDecoder();
-      const fileIdBytes = data.slice(0, 36);
+      const fileIdBytes = data.slice(0, FILE_ID_HEADER);
       const fileId = decoder.decode(fileIdBytes).trim();
-      const chunk = data.slice(36);
+      const chunk = data.slice(FILE_ID_HEADER);
 
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
@@ -367,7 +375,14 @@ export const useWebRTC = () => {
           }
         }
       } else {
-        logger.warn('Transfer', `Received chunk for unknown fileId: ${fileId}`);
+        // Buffer chunks that arrive before their file-start message
+        let buf = earlyChunks.current.get(fileId);
+        if (!buf) {
+          buf = [];
+          earlyChunks.current.set(fileId, buf);
+          logger.debug('Transfer', `Buffering early chunks for fileId: ${fileId}`);
+        }
+        buf.push(chunk);
       }
     }
   }, [finalizeReceivedFile]);
@@ -390,8 +405,12 @@ export const useWebRTC = () => {
       // This ensures we don't have circular dependencies
     };
 
-    channel.onerror = (error) => {
-      logger.error('DataChannel', `error`, `${remoteDeviceId} ${error}`);
+    channel.onerror = (event) => {
+      const rtcErr = (event as RTCErrorEvent).error;
+      const detail = rtcErr
+        ? `${rtcErr.errorDetail ?? ''} ${rtcErr.message ?? ''}`.trim()
+        : 'unknown error';
+      logger.error('DataChannel', `error with ${remoteDeviceId}`, detail);
     };
 
     channel.onmessage = (event) => handleDataMessage(remoteDeviceId, event.data);
@@ -1041,10 +1060,10 @@ export const useWebRTC = () => {
       const totalBytes = buffer.byteLength;
       let offset = 0;
       const encoder = new TextEncoder();
-      const fileIdBytes = encoder.encode(fileId.padEnd(36, ' '));
+      const fileIdBytes = encoder.encode(fileId.padEnd(FILE_ID_HEADER, ' '));
 
       // Pre-allocate reusable send buffer to avoid per-chunk allocation
-      const sendBuf = new Uint8Array(36 + CHUNK_SIZE);
+      const sendBuf = new Uint8Array(FILE_ID_HEADER + CHUNK_SIZE);
       sendBuf.set(fileIdBytes, 0);
       let lastSenderProgress = 0;
 
@@ -1070,9 +1089,8 @@ export const useWebRTC = () => {
                 const chunkLen = end - offset;
 
                 // Reuse pre-allocated buffer: copy chunk data after the 36-byte header
-                sendBuf.set(new Uint8Array(buffer, offset, chunkLen), 36);
-                // Send only the exact slice needed (header + actual chunk length)
-                dc.send(sendBuf.buffer.slice(0, 36 + chunkLen));
+                sendBuf.set(new Uint8Array(buffer, offset, chunkLen), FILE_ID_HEADER);
+                dc.send(sendBuf.buffer.slice(0, FILE_ID_HEADER + chunkLen));
 
                 offset = end;
 
