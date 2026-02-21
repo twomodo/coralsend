@@ -61,6 +61,19 @@ export function WelcomeContent() {
       <section className="flex flex-col items-center gap-4 pt-4">
         <p className="text-[var(--text-muted)] text-xs">v{APP_VERSION}</p>
         <SocialLinks iconSize={20} />
+        <div className="flex items-center gap-3 text-sm">
+          <Link href="/privacy" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+            Privacy
+          </Link>
+          <span className="text-[var(--text-muted)]">·</span>
+          <Link href="/terms" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+            Terms
+          </Link>
+          <span className="text-[var(--text-muted)]">·</span>
+          <Link href="/acceptable-use" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+            Acceptable use
+          </Link>
+        </div>
         <Link href="/changelog" className="text-[var(--text-muted)] hover:text-teal-400 text-sm transition-colors">
           Changelog
         </Link>

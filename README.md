@@ -12,6 +12,8 @@
 
 CoralSend is a **minimal, P2P-first file transfer** app built with a Next.js PWA frontend and a Go signaling server.
 
+![CoralSend banner](./coralsend-gh.png)
+
 It is designed around two goals:
 - **Simple UX**: open → connect → send/receive.
 - **Secure-by-default transport**: peer-to-peer transfer over **WebRTC DataChannels** (DTLS encrypted in transit).
@@ -33,6 +35,15 @@ However, this MVP **does not yet implement application-layer end-to-end encrypti
 That means:
 - The server still does **not** store files, but
 - The “zero-knowledge keys” design is **planned**, not fully implemented yet.
+
+## Licensing
+
+CoralSend uses a split licensing model:
+
+- Community code license: **AGPL-3.0-only** (`LICENSE`)
+- Commercial self-host terms: `COMMERCIAL_LICENSE.md`
+- Trademark/brand usage policy: `TRADEMARKS.md`
+- Plain-language licensing guide: `docs/legal/licensing.md`
 
 ## Architecture overview
 
@@ -183,6 +194,9 @@ cp .env.example .env
 - `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`: TURN relay configuration.
 - `NEXT_PUBLIC_ICE_DIAGNOSTICS`: Enables additional ICE path/error logs in browser console when set to `true`.
 - `NEXT_PUBLIC_GITHUB_URL` (+ optional social URLs): Used for footer/changelog social links.
+- `APP_ENV`: Runtime mode for signaling hardening (`production` enables strict origin checks).
+- `ALLOWED_ORIGINS`: Comma-separated origin allowlist for signaling HTTP CORS and WebSocket origin validation.
+- `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`: Basic per-IP fixed-window signaling rate limits on `/ws`.
 
 **Example for subdirectory deployment:**
 ```bash
