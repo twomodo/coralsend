@@ -31,21 +31,6 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
-// Paste type filter: match file type (same categories as FileList)
-const PASTE_ACCEPT_TYPES = [
-  { id: 'all', label: 'All' },
-  { id: 'text', label: 'Text', match: (t: string) => t.startsWith('text/') },
-  { id: 'image', label: 'Images', match: (t: string) => t.startsWith('image/') },
-  { id: 'video', label: 'Videos', match: (t: string) => t.startsWith('video/') },
-  { id: 'audio', label: 'Audio', match: (t: string) => t.startsWith('audio/') },
-] as const;
-
-function acceptFileByFilter(file: File, filterId: string): boolean {
-  if (filterId === 'all') return true;
-  const category = PASTE_ACCEPT_TYPES.find((c) => c.id === filterId);
-  return category && 'match' in category ? category.match(file.type || '') : true;
-}
-
 interface RoomViewProps {
   onLeaveRoom: () => void;
   onShareFile: (file: File) => void;
@@ -65,23 +50,17 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
   const [copySuccess, setCopySuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
   const [isDragOver, setIsDragOver] = useState(false);
-  const [pasteTypeFilter] = useState<string>('all');
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const shareUrl = currentRoom ? `${getBaseUrl()}/room/${currentRoom.id}` : '';
 
-  // Paste from clipboard (keyboard or button): filter and share
+  // Paste from clipboard (keyboard or button): share all files without filtering
   const processPastedFiles = useCallback(
     (files: File[]) => {
-      const accepted = files.filter((file) => acceptFileByFilter(file, pasteTypeFilter));
-      accepted.forEach((file) => onShareFile(file));
-      if (files.length > 0 && accepted.length === 0) {
-        setPasteError('No files match the current type filter');
-        setTimeout(() => setPasteError(null), 3000);
-      }
+      files.forEach((file) => onShareFile(file));
     },
-    [onShareFile, pasteTypeFilter]
+    [onShareFile]
   );
 
   // Paste event (Ctrl+V / Cmd+V) – only when Outbox tab is active
@@ -95,10 +74,9 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
       if (clipboardData.files?.length) {
         files.push(...Array.from(clipboardData.files));
       }
-      // If no files, check for pasted text (selected text from editor, etc.)
       if (files.length === 0) {
         const text = clipboardData.getData('text/plain');
-        if (text?.trim() && (pasteTypeFilter === 'all' || pasteTypeFilter === 'text')) {
+        if (text?.trim()) {
           files.push(new File([text], 'pasted-text.txt', { type: 'text/plain' }));
         }
       }
@@ -108,7 +86,7 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [activeTab, processPastedFiles, pasteTypeFilter]);
+  }, [activeTab, processPastedFiles]);
 
   // Paste button: Async Clipboard API (for mobile / programmatic paste)
   const handlePasteClick = useCallback(async () => {
@@ -123,23 +101,34 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
       const items = await navigator.clipboard.read();
       const files: File[] = [];
       for (const item of items) {
-        if (item.types?.find((t) => t.startsWith('image/'))) {
-          const imageType = item.types.find((t) => t.startsWith('image/'))!;
-          const blob = await item.getType(imageType);
-          const ext = imageType.split('/')[1] || 'png';
-          files.push(new File([blob], `pasted-image.${ext}`, { type: imageType }));
-        } else if (item.types?.includes('text/plain') && (pasteTypeFilter === 'all' || pasteTypeFilter === 'text')) {
-          const blob = await item.getType('text/plain');
-          const text = await blob.text();
-          if (text?.trim()) {
-            files.push(new File([text], 'pasted-text.txt', { type: 'text/plain' }));
-          }
+        // Try every non-text MIME type as a file (images, videos, PDFs, etc.)
+        let handledAsBlob = false;
+        for (const mimeType of item.types) {
+          if (mimeType === 'text/plain') continue;
+          try {
+            const blob = await item.getType(mimeType);
+            const ext = mimeType.split('/')[1]?.split(';')[0] || 'bin';
+            const name = `pasted-file.${ext}`;
+            files.push(new File([blob], name, { type: mimeType }));
+            handledAsBlob = true;
+            break;
+          } catch { /* type not available */ }
+        }
+        // Fallback to text if no blob type was handled
+        if (!handledAsBlob && item.types?.includes('text/plain')) {
+          try {
+            const blob = await item.getType('text/plain');
+            const text = await blob.text();
+            if (text?.trim()) {
+              files.push(new File([text], 'pasted-text.txt', { type: 'text/plain' }));
+            }
+          } catch { /* ignore */ }
         }
       }
       if (files.length > 0) {
         processPastedFiles(files);
       } else {
-        setPasteError('No image or text in clipboard');
+        setPasteError('Nothing to paste from clipboard');
         setTimeout(() => setPasteError(null), 3000);
       }
     } catch (err) {
@@ -149,7 +138,7 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
     } finally {
       setIsPasting(false);
     }
-  }, [processPastedFiles, pasteTypeFilter]);
+  }, [processPastedFiles]);
 
   const canUsePasteButton = typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
 
