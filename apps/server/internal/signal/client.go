@@ -19,9 +19,8 @@ const (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow CORS for local dev
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		return IsOriginAllowed(r.Header.Get("Origin"))
 	},
 }
 
@@ -78,43 +77,43 @@ func (c *Client) readPump() {
 			if msg.Payload != nil {
 				json.Unmarshal(msg.Payload, &joinPayload)
 			}
-			
+
 			c.RoomID = msg.RoomID
 			c.DeviceID = joinPayload.DeviceID
 			c.DisplayName = joinPayload.DisplayName
 			c.JoinedAt = time.Now().UnixMilli()
-			
+
 			if c.DeviceID == "" {
 				c.DeviceID = msg.DeviceID
 			}
 			if c.DisplayName == "" {
 				c.DisplayName = c.DeviceID
 			}
-			
+
 			log.Printf("Join request: room=%s, device=%s, name=%s", c.RoomID, c.DeviceID, c.DisplayName)
 			c.Hub.register <- c
-			
+
 		case "offer", "answer", "candidate":
 			// WebRTC signaling - relay to specific target or broadcast
 			if c.RoomID == msg.RoomID {
 				msg.DeviceID = c.DeviceID // Always set sender's device ID
 				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
 			}
-			
+
 		case "file-meta":
 			// File metadata broadcast - send to all room members
 			if c.RoomID == msg.RoomID {
 				msg.DeviceID = c.DeviceID
 				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
 			}
-			
+
 		case "file-request":
 			// Request to download a file - directed to file owner
 			if c.RoomID == msg.RoomID {
 				msg.DeviceID = c.DeviceID
 				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
 			}
-			
+
 		default:
 			// Relay other messages
 			if c.RoomID == msg.RoomID {

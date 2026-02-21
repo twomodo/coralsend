@@ -29,7 +29,8 @@ export function WelcomeView() {
         <div className="text-center mb-12">
           <Logo size="lg" className="justify-center mb-4" />
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-3">
-            Send files directly. No cloud, no account.
+            Send files directly.<br />
+            No cloud, no account.
           </h1>
           <p className="text-[var(--text-muted)] text-base sm:text-lg leading-relaxed max-w-md mx-auto">
             Create a room, share the link, and send files straight to the other device. Everything stays between you and the receiver—encrypted and private.
