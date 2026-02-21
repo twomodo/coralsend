@@ -32,6 +32,8 @@ export function DebugPanel() {
   const [filter, setFilter] = useState<LogCategory | 'all'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
   const members = useStore((s) => s.currentRoom?.members);
+  const debugEnabled = useStore((s) => s.debugEnabled);
+  const setDebugEnabled = useStore((s) => s.setDebugEnabled);
 
   useEffect(() => {
     setEntries(logger.getEntries());
@@ -44,27 +46,31 @@ export function DebugPanel() {
     }
   }, [entries, open]);
 
-  // Keyboard shortcut: Ctrl+Shift+D
+  // Keyboard shortcut: Ctrl+Shift+D (also enables debug if disabled)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
+        if (!debugEnabled) setDebugEnabled(true);
         setOpen((v) => !v);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
+  }, [debugEnabled, setDebugEnabled]);
 
   const filtered = filter === 'all' ? entries : entries.filter((e) => e.category === filter);
 
   const toggleOpen = useCallback(() => setOpen((v) => !v), []);
 
+  // Only render when debug is enabled via Settings
+  if (!debugEnabled) return null;
+
   if (!open) {
     return (
       <button
         onClick={toggleOpen}
-        className="fixed bottom-4 right-4 z-50 p-2 rounded-full glass border border-[var(--border-soft)] text-[var(--text-muted)] hover:text-teal-400 transition-colors"
+        className="fixed bottom-14 left-3 z-40 p-2 rounded-full glass border border-[var(--border-soft)] text-[var(--text-muted)] hover:text-teal-400 transition-colors"
         title="Debug panel (Ctrl+Shift+D)"
       >
         <Terminal className="w-4 h-4" />

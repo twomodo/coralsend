@@ -19,7 +19,7 @@ import {
 import {
   Copy,
   Check,
-  ArrowLeft,
+  Home,
   FileUp,
   Share2,
   Users,
@@ -190,8 +190,8 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
       <header className="px-3 py-2.5 border-b border-[var(--border-soft)] glass-strong">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={onLeaveRoom}>
-              <ArrowLeft className="w-5 h-5" />
+            <Button variant="ghost" size="icon" onClick={onLeaveRoom} title="Back to home">
+              <Home className="w-5 h-5" />
             </Button>
             <div>
               <h1 className="font-semibold text-[var(--text-primary)] text-sm">Room {currentRoom.id}</h1>
@@ -291,23 +291,23 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
               </span>
             }
             actions={
-              activeTab === 'outbox' ? (
-                <div className="flex items-center gap-1.5">
+              activeTab === 'outbox' && outboxCount > 0 ? (
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-xs font-medium text-teal-500 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors px-2.5 py-1.5 rounded-md hover:bg-teal-400/10 border border-teal-400/20 min-h-8"
-                    aria-label="Add file to share"
-                    title="Add file to share"
+                    className="flex items-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 transition-all px-3 py-1.5 rounded-lg shadow-sm"
+                    aria-label="Share a file"
+                    title="Share a file"
                   >
                     <FileUp className="w-4 h-4" />
-                    <span>Add</span>
+                    <span>Share File</span>
                   </button>
                   {canUsePasteButton && (
                     <button
                       type="button"
                       onClick={handlePasteClick}
                       disabled={isPasting}
-                      className="flex items-center gap-1.5 text-xs font-medium text-teal-500 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors px-2.5 py-1.5 rounded-md hover:bg-teal-400/10 border border-teal-400/20 min-h-8 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-teal-400/10 border border-teal-400/25 disabled:opacity-50"
                       aria-label="Paste from clipboard"
                       title="Paste from clipboard"
                     >
@@ -325,6 +325,8 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
               onDownload={onRequestFile}
               onCancelDownload={onCancelDownload}
               onCopyTextFile={onCopyTextFile}
+              onAddFile={activeTab === 'outbox' ? () => fileInputRef.current?.click() : undefined}
+              onPaste={activeTab === 'outbox' && canUsePasteButton ? handlePasteClick : undefined}
               hideHeader
               hideFilters
             />

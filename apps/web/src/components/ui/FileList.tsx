@@ -26,6 +26,10 @@ import {
   File,
   Wifi,
   Globe,
+  FileUp,
+  ClipboardPaste,
+  Shield,
+  Zap,
 } from 'lucide-react';
 
 // ============ File Type Categories ============
@@ -334,13 +338,15 @@ interface FileListProps {
   onDownload?: (file: FileMetadata) => void;
   onCancelDownload?: (fileId: string) => void;
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
+  onAddFile?: () => void;
+  onPaste?: () => void;
   className?: string;
   hideHeader?: boolean;
   /** When true, filters row (Pending/Done, Type, Sort) is hidden; code kept for later */
   hideFilters?: boolean;
 }
 
-export function FileList({ direction, onDownload, onCancelDownload, onCopyTextFile, className, hideHeader, hideFilters }: FileListProps) {
+export function FileList({ direction, onDownload, onCancelDownload, onCopyTextFile, onAddFile, onPaste, className, hideHeader, hideFilters }: FileListProps) {
   const allFiles = useStore((s) => s.currentRoom?.files);
   const members = useStore((s) => s.currentRoom?.members);
 
@@ -503,18 +509,67 @@ export function FileList({ direction, onDownload, onCancelDownload, onCopyTextFi
           ))}
         </div>
       ) : (
-        <div className="text-center py-10 text-[var(--text-muted)]">
-          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--surface-glass-strong)] border border-[var(--border-soft)]">
-            <Icon className="w-7 h-7 opacity-40" />
-          </div>
-          <p className="font-medium text-[var(--text-secondary)]">{hasFilters ? 'No files match filters' : emptyMessage}</p>
-          <p className="text-xs mt-1 opacity-70">
-            {isInbox ? 'Files shared by other members will appear here' : 'Drag & drop, paste, or use the + button'}
-          </p>
-          {hasFilters && (
-            <button onClick={clearFilters} className="mt-3 text-sm text-teal-400 hover:underline">
-              Clear filters
-            </button>
+        <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)]">
+          {hasFilters ? (
+            <>
+              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-[var(--surface-glass-strong)] border border-[var(--border-soft)]">
+                <Icon className="w-6 h-6 opacity-40" />
+              </div>
+              <p className="font-medium text-[var(--text-secondary)]">No files match filters</p>
+              <button onClick={clearFilters} className="mt-3 text-sm text-teal-400 hover:underline">
+                Clear filters
+              </button>
+            </>
+          ) : isInbox ? (
+            <>
+              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
+                <Inbox className="w-6 h-6 text-cyan-400 opacity-70" />
+              </div>
+              <p className="font-medium text-[var(--text-secondary)]">Waiting for files</p>
+              <p className="text-xs mt-1 max-w-[260px] text-center leading-relaxed opacity-70">
+                When someone shares a file, it downloads directly from their device to yours
+              </p>
+              <div className="flex items-center gap-4 mt-4 text-[10px] uppercase tracking-wider opacity-50">
+                <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Encrypted</span>
+                <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Peer-to-peer</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-teal-500/10 border border-teal-500/20">
+                <Send className="w-6 h-6 text-teal-400 opacity-70" />
+              </div>
+              <p className="font-medium text-[var(--text-secondary)]">Share your first file</p>
+              <p className="text-xs mt-1 max-w-[260px] text-center leading-relaxed opacity-70">
+                Files go directly to other devices -- nothing is uploaded to a server
+              </p>
+
+              {/* Inline action buttons */}
+              <div className="flex items-center gap-3 mt-5">
+                {onAddFile && (
+                  <button
+                    onClick={onAddFile}
+                    className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 transition-all px-5 py-2.5 rounded-xl shadow-lg shadow-teal-500/20"
+                  >
+                    <FileUp className="w-4.5 h-4.5" />
+                    Share File
+                  </button>
+                )}
+                {onPaste && (
+                  <button
+                    onClick={onPaste}
+                    className="flex items-center gap-2 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors px-4 py-2.5 rounded-xl border border-teal-400/25 hover:bg-teal-400/10"
+                  >
+                    <ClipboardPaste className="w-4 h-4" />
+                    Paste
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[10px] mt-4 opacity-40">
+                or drag & drop files anywhere
+              </p>
+            </>
           )}
         </div>
       )}

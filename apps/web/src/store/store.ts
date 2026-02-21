@@ -122,6 +122,10 @@ interface AppState {
   removeFromHistory: (roomId: string) => void;
   clearHistory: () => void;
   
+  // Settings
+  debugEnabled: boolean;
+  setDebugEnabled: (enabled: boolean) => void;
+
   // Pending share (from PWA share_target; not persisted)
   pendingShareFiles: File[];
   setPendingShareFiles: (files: File[]) => void;
@@ -148,6 +152,7 @@ const initialState = {
   roomHistory: [],
   fileDownloaders: {} as Record<string, Array<{ deviceId: string; displayName: string }>>,
   fileDownloaderProgress: {} as Record<string, Record<string, number>>,
+  debugEnabled: false,
   pendingShareFiles: [] as File[],
 };
 
@@ -483,6 +488,9 @@ export const useStore = create<AppState>()(
       },
 
       // Pending share (from PWA share_target)
+      // Settings
+      setDebugEnabled: (enabled) => set({ debugEnabled: enabled }),
+
       setPendingShareFiles: (files) => set({ pendingShareFiles: files }),
       clearPendingShareFiles: () => set({ pendingShareFiles: [] }),
 

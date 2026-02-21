@@ -13,6 +13,7 @@ import {
   Shield,
   Copy,
   Check,
+  Terminal,
 } from 'lucide-react';
 
 interface RoomSettingsProps {
@@ -24,6 +25,8 @@ interface RoomSettingsProps {
 export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const setRoomName = useStore((s) => s.setRoomName);
+  const debugEnabled = useStore((s) => s.debugEnabled);
+  const setDebugEnabled = useStore((s) => s.setDebugEnabled);
   
   const [name, setName] = useState(currentRoom?.name || '');
   const [maxMembers, setMaxMembers] = useState(8);
@@ -176,6 +179,31 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 className={cn(
                   'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
                   requireApproval ? 'translate-x-7' : 'translate-x-1'
+                )}
+              />
+            </button>
+          </div>
+
+          {/* Debug Console */}
+          <div className="flex items-center justify-between glass rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--text-primary)]">Debug Console</p>
+                <p className="text-xs text-[var(--text-muted)]">Show logs for power users (Ctrl+Shift+D)</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDebugEnabled(!debugEnabled)}
+              className={cn(
+                'w-12 h-6 rounded-full transition-colors relative',
+                debugEnabled ? 'bg-teal-500' : 'bg-[var(--text-muted)]'
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  debugEnabled ? 'translate-x-7' : 'translate-x-1'
                 )}
               />
             </button>
