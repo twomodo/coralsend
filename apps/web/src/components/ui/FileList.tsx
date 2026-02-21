@@ -71,9 +71,9 @@ interface FileItemProps {
 function ConnectionPathIcon({ path }: { path?: ConnectionPath }) {
   if (!path || path === 'unknown') return null;
   if (path === 'direct') {
-    return <Wifi className="w-3 h-3 text-teal-400 flex-shrink-0" aria-label="Direct (LAN)" title="Direct (LAN)" />;
+    return <Wifi className="w-3 h-3 text-teal-400 flex-shrink-0" aria-label="Direct (LAN)" role="img" />;
   }
-  return <Globe className="w-3 h-3 text-amber-400 flex-shrink-0" aria-label="Via internet (relay)" title="Via internet (relay)" />;
+  return <Globe className="w-3 h-3 text-amber-400 flex-shrink-0" aria-label="Via internet (relay)" role="img" />;
 }
 
 function FileItem({

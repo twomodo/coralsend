@@ -77,8 +77,8 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
             <div className="flex items-center gap-1 sm:gap-2">
               {member.status === 'online' && member.connectionPath && member.connectionPath !== 'unknown' && (
                 member.connectionPath === 'direct'
-                  ? <Wifi className="w-3 h-3 text-teal-400" title="Direct (LAN)" />
-                  : <Globe className="w-3 h-3 text-amber-400" title="Via internet (relay)" />
+                  ? <Wifi className="w-3 h-3 text-teal-400" aria-label="Direct (LAN)" role="img" />
+                  : <Globe className="w-3 h-3 text-amber-400" aria-label="Via internet (relay)" role="img" />
               )}
               <span
                 className={cn(
