@@ -141,18 +141,17 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
             </div>
           </div>
 
-          {/* Outbox: show who is downloading */}
+          {/* Outbox: show who is downloading with per-peer progress */}
           {isOutbox && fileDownloaders.length > 0 && (
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-[var(--text-muted)]">Downloading:</span>
-              <div className="flex -space-x-1.5">
-                {fileDownloaders.map((d, i) => {
+            <div className="mt-2 space-y-1.5">
+              <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Sending to:</span>
+              <div className="flex flex-wrap gap-2">
+                {fileDownloaders.map((d) => {
                   const progress = downloaderProgress[d.deviceId] ?? 0;
                   return (
                     <div
                       key={d.deviceId}
-                      className="relative shrink-0"
-                      style={{ zIndex: fileDownloaders.length - i }}
+                      className="flex items-center gap-1.5"
                       title={`${d.displayName} ${progress}%`}
                     >
                       <div
@@ -168,6 +167,7 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
                           {getInitials(d.deviceId)}
                         </div>
                       </div>
+                      <span className="text-[10px] font-medium text-cyan-500 dark:text-cyan-300">{progress}%</span>
                     </div>
                   );
                 })}
@@ -237,25 +237,37 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
       {isInbox && (
         <button
           type="button"
-          onClick={() => (isDownloading && onCancelDownload ? onCancelDownload(file.id) : onDownload?.(file))}
-          disabled={isDownloading && !onCancelDownload}
+          onClick={() => {
+            if (isCompleted) return;
+            if (isDownloading && onCancelDownload) { onCancelDownload(file.id); return; }
+            onDownload?.(file);
+          }}
+          disabled={isCompleted || (isDownloading && !onCancelDownload)}
           className={cn(
             'absolute right-0 top-0 bottom-0 w-10 sm:w-12',
             'inline-flex flex-col items-center justify-center gap-1',
             'rounded-none rounded-r-xl border-l transition-colors',
             'focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-inset',
-            'disabled:opacity-80 disabled:cursor-default',
-            isError
-              ? 'bg-red-500/10 text-red-500 dark:text-red-300 border-red-500/25 hover:bg-red-500/20'
-              : isDownloading && onCancelDownload
+            'disabled:cursor-default',
+            isCompleted
+              ? 'bg-teal-500/10 text-teal-400 border-teal-500/25'
+              : isError
                 ? 'bg-red-500/10 text-red-500 dark:text-red-300 border-red-500/25 hover:bg-red-500/20'
-                : 'bg-gradient-to-b from-teal-500 to-cyan-500 text-white border-teal-400/30 hover:from-teal-400 hover:to-cyan-400'
+                : isDownloading && onCancelDownload
+                  ? 'bg-red-500/10 text-red-500 dark:text-red-300 border-red-500/25 hover:bg-red-500/20'
+                  : 'bg-gradient-to-b from-teal-500 to-cyan-500 text-white border-teal-400/30 hover:from-teal-400 hover:to-cyan-400'
           )}
-          aria-label={isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
-          title={isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
+          aria-label={isCompleted ? 'Downloaded' : isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
+          title={isCompleted ? 'Downloaded' : isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
         >
-          {isCompleted ? <CheckCircle className="w-4 h-4" /> : isDownloading && onCancelDownload ? <X className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-          <span className="text-[10px] leading-none">{isError ? 'Retry' : isDownloading && onCancelDownload ? 'Cancel' : 'Save'}</span>
+          {isCompleted
+            ? <CheckCircle className="w-4 h-4" />
+            : isDownloading && onCancelDownload
+              ? <X className="w-4 h-4" />
+              : <Download className="w-4 h-4" />}
+          <span className="text-[10px] leading-none">
+            {isCompleted ? 'Done' : isError ? 'Retry' : isDownloading && onCancelDownload ? 'Cancel' : 'Save'}
+          </span>
         </button>
       )}
     </div>
@@ -491,11 +503,16 @@ export function FileList({ direction, onDownload, onCancelDownload, onCopyTextFi
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 text-[var(--text-muted)]">
-          <Icon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>{hasFilters ? 'No files match filters' : emptyMessage}</p>
+        <div className="text-center py-10 text-[var(--text-muted)]">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--surface-glass-strong)] border border-[var(--border-soft)]">
+            <Icon className="w-7 h-7 opacity-40" />
+          </div>
+          <p className="font-medium text-[var(--text-secondary)]">{hasFilters ? 'No files match filters' : emptyMessage}</p>
+          <p className="text-xs mt-1 opacity-70">
+            {isInbox ? 'Files shared by other members will appear here' : 'Drag & drop, paste, or use the + button'}
+          </p>
           {hasFilters && (
-            <button onClick={clearFilters} className="mt-2 text-sm text-teal-400 hover:underline">
+            <button onClick={clearFilters} className="mt-3 text-sm text-teal-400 hover:underline">
               Clear filters
             </button>
           )}

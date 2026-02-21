@@ -415,14 +415,15 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
       {/* Drop zone overlay */}
       {isDragOver && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center"
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
         >
-          <div className="text-center">
-            <FileUp className="w-16 h-16 text-teal-400 mx-auto mb-4" />
+          <div className="text-center p-10 rounded-3xl border-2 border-dashed border-teal-400/50 bg-teal-500/5">
+            <FileUp className="w-16 h-16 text-teal-400 mx-auto mb-4 animate-bounce" />
             <p className="text-xl font-semibold text-[var(--text-primary)]">Drop files to share</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">Any file type, any size</p>
           </div>
         </div>
       )}
