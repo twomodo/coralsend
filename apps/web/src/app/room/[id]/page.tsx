@@ -6,6 +6,7 @@ import { useWebRTC } from '@/hooks/useWebRTC';
 import { useStore } from '@/store/store';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { RoomView } from '@/components/views/RoomView';
+import { DebugPanel } from '@/components/ui/DebugPanel';
 
 export default function RoomPage() {
   const params = useParams();
@@ -100,6 +101,7 @@ export default function RoomPage() {
           onCopyTextFile={copyTextFile}
         />
       </div>
+      <DebugPanel />
     </main>
   );
 }

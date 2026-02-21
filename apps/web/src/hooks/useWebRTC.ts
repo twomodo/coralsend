@@ -3,6 +3,7 @@ import { useStore, type Member, type FileMetadata, type ChatMessage, type Connec
 import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
+import { logger } from '@/lib/logger';
 
 // ============ Types ============
 
@@ -127,7 +128,7 @@ async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Pro
     });
 
     if (!selectedPair) {
-      if (ICE_DIAGNOSTICS) console.log(`[ICE][${remoteDeviceId}] no selected candidate pair yet`);
+      if (ICE_DIAGNOSTICS) logger.debug('ICE', `no selected candidate pair yet`, remoteDeviceId);
       return 'unknown';
     }
 
@@ -144,14 +145,12 @@ async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Pro
     const localProtocol = (local as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
     const remoteProtocol = (remote as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
 
-    console.log(
-      `[ICE][${remoteDeviceId}] selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`
-    );
+    logger.info('ICE', `selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`, remoteDeviceId);
 
     const isRelay = localType === 'relay' || remoteType === 'relay';
     return isRelay ? 'relay' : 'direct';
   } catch (error) {
-    console.warn(`[ICE][${remoteDeviceId}] failed to read selected candidate pair`, error);
+    logger.warn('ICE', `failed to read selected candidate pair`, `${remoteDeviceId} ${error}`);
     return 'unknown';
   }
 }
@@ -263,7 +262,7 @@ export const useWebRTC = () => {
         if (msg.type === 'file-start') {
           // Receiving file data start
           const meta = msg.payload as FileMetadataPayload;
-          console.log('Receiving file from', senderDeviceId, ':', meta.name);
+          logger.info('Transfer', `Receiving file: ${meta.name}`, senderDeviceId);
 
           // Ensure file exists in store (in case file-meta was missed)
           const existingFile = store.currentRoom?.files.find(f => f.id === meta.id);
@@ -299,7 +298,7 @@ export const useWebRTC = () => {
               fileType: incoming.meta.type,
               fileSize: incoming.meta.size,
             });
-            console.log('File transfer complete:', incoming.meta.name);
+            logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
             incomingChunks.current.delete(fileId);
@@ -368,7 +367,7 @@ export const useWebRTC = () => {
           }
         }
       } else {
-        console.warn('Received chunk for unknown fileId:', fileId);
+        logger.warn('Transfer', `Received chunk for unknown fileId: ${fileId}`);
       }
     }
   }, [finalizeReceivedFile]);
@@ -378,12 +377,12 @@ export const useWebRTC = () => {
     channel.bufferedAmountLowThreshold = BUFFER_LOW_THRESHOLD;
 
     channel.onopen = () => {
-      console.log('Data channel open with', remoteDeviceId);
+      logger.info('DataChannel', `open`, remoteDeviceId);
       useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
     };
 
     channel.onclose = () => {
-      console.log('Data channel closed with', remoteDeviceId);
+      logger.info('DataChannel', `closed`, remoteDeviceId);
       const store = useStore.getState();
       store.updateMemberStatus(remoteDeviceId, 'offline');
 
@@ -392,7 +391,7 @@ export const useWebRTC = () => {
     };
 
     channel.onerror = (error) => {
-      console.error('Data channel error with', remoteDeviceId, ':', error);
+      logger.error('DataChannel', `error`, `${remoteDeviceId} ${error}`);
     };
 
     channel.onmessage = (event) => handleDataMessage(remoteDeviceId, event.data);
@@ -431,7 +430,7 @@ export const useWebRTC = () => {
       }
     }
 
-    console.log('Creating peer connection with', remoteDeviceId, isInitiator ? '(initiator)' : '(receiver)');
+    logger.info('ICE', `Creating peer connection ${isInitiator ? '(initiator)' : '(receiver)'}`, remoteDeviceId);
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peers.current.set(remoteDeviceId, pc);
@@ -453,7 +452,7 @@ export const useWebRTC = () => {
 
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
-      console.log('ICE connection state with', remoteDeviceId, ':', state);
+      logger.info('ICE', `connection state: ${state}`, remoteDeviceId);
 
       if (state === 'connected' || state === 'completed') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
@@ -522,7 +521,7 @@ export const useWebRTC = () => {
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      console.log('Connection state with', remoteDeviceId, ':', state);
+      logger.info('ICE', `peer connection state: ${state}`, remoteDeviceId);
 
       if (state === 'connected') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
@@ -875,12 +874,12 @@ export const useWebRTC = () => {
     }
 
     const wsUrl = getSignalingServerUrl();
-    console.log('Connecting to signaling server:', wsUrl);
+    logger.info('Signaling', `Connecting to ${wsUrl}`);
 
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
-      console.log('WebSocket connected');
+      logger.info('Signaling', 'WebSocket connected');
 
       const joinPayload = { deviceId, displayName };
       ws.current?.send(JSON.stringify({
@@ -900,13 +899,13 @@ export const useWebRTC = () => {
     };
 
     ws.current.onerror = (err) => {
-      console.error('WebSocket error:', err);
+      logger.error('Signaling', 'WebSocket error', String(err));
       store.setError(`Connection failed: ${wsUrl}`);
       store.setStatus('error');
     };
 
     ws.current.onclose = (event) => {
-      console.log('WebSocket closed:', event.code);
+      logger.info('Signaling', `WebSocket closed: ${event.code}`);
       if (event.code !== 1000 && store.status !== 'idle') {
         store.setStatus('disconnected');
       }
@@ -1011,7 +1010,7 @@ export const useWebRTC = () => {
   const sendFileToOne = useCallback(async (file: File, fileId: string, targetDeviceId: string) => {
     const dc = dataChannels.current.get(targetDeviceId);
     if (!dc || dc.readyState !== 'open') {
-      console.error('No data channel to', targetDeviceId);
+      logger.error('Transfer', `No data channel`, targetDeviceId);
       return;
     }
 
@@ -1098,11 +1097,11 @@ export const useWebRTC = () => {
       // Send end message (receiver will send file-progress 100% when done, then we remove downloader)
       dc.send(JSON.stringify({ type: 'file-end', fileId }));
       completed = true;
-      console.log('File sent to', targetDeviceId);
+      logger.info('Transfer', `File sent`, targetDeviceId);
 
     } catch (err) {
       if ((err as Error).message !== 'Cancelled') {
-        console.error('Send error:', err);
+        logger.error('Transfer', `Send error: ${err}`);
       }
     } finally {
       sendAbortControllers.current.delete(abortKey);
