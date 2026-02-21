@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { MemberAvatar } from './MemberAvatar';
 import { useStore } from '@/store/store';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wifi, Globe } from 'lucide-react';
 import { Button } from './Button';
 
 interface MemberListProps {
@@ -75,6 +75,11 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
               <p className="text-xs text-[var(--text-muted)] truncate">{member.deviceId}</p>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
+              {member.status === 'online' && member.connectionPath && member.connectionPath !== 'unknown' && (
+                member.connectionPath === 'direct'
+                  ? <Wifi className="w-3 h-3 text-teal-400" aria-label="Direct (LAN)" role="img" />
+                  : <Globe className="w-3 h-3 text-amber-400" aria-label="Via internet (relay)" role="img" />
+              )}
               <span
                 className={cn(
                   'text-xs px-2 py-0.5 rounded-full whitespace-nowrap',

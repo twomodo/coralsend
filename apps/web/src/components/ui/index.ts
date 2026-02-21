@@ -17,3 +17,5 @@ export { RoomSettings } from './RoomSettings';
 export { SocialLinks } from './SocialLinks';
 export { CreateRoomButton } from './CreateRoomButton';
 export { ThemeToggle } from './ThemeToggle';
+export { Switch } from './Switch';
+export { ActionButton } from './ActionButton';
