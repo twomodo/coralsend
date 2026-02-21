@@ -41,9 +41,9 @@ type ChatMessagePayload = {
 
 // ============ Constants ============
 
-const CHUNK_SIZE = 16 * 1024; // 16KB chunks
-const BUFFER_LOW_THRESHOLD = 65536; // 64KB
-const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB
+const CHUNK_SIZE = 256 * 1024; // 256KB chunks
+const BUFFER_LOW_THRESHOLD = 256 * 1024; // 256KB
+const BUFFER_HIGH_THRESHOLD = 4 * 1024 * 1024; // 4MB
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
@@ -165,7 +165,7 @@ export const useWebRTC = () => {
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number }>>(new Map());
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
   const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
@@ -278,7 +278,7 @@ export const useWebRTC = () => {
             }, meta.id);
           }
 
-          incomingChunks.current.set(meta.id, { meta, chunks: [] });
+          incomingChunks.current.set(meta.id, { meta, chunks: [], receivedBytes: 0, startTime: Date.now() });
           store.updateFileStatus(meta.id, 'downloading');
           store.updateFileProgress(meta.id, 0);
 
@@ -343,11 +343,16 @@ export const useWebRTC = () => {
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
         incoming.chunks.push(chunk);
-        const received = incoming.chunks.reduce((acc, c) => acc + c.byteLength, 0);
-        const progress = Math.min(100, Math.round((received / incoming.meta.size) * 100));
-        store.updateFileProgress(fileId, progress);
+        incoming.receivedBytes += chunk.byteLength;
+        const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
-        // Report progress back to sender so avatar matches actual receiver progress (throttle to ~5% steps)
+        // Throttle UI store updates to 1% steps (avoid 131k updates for large files)
+        const prevProgress = store.currentRoom?.files.find(f => f.id === fileId)?.progress ?? 0;
+        if (progress >= 100 || progress - prevProgress >= 1) {
+          store.updateFileProgress(fileId, progress);
+        }
+
+        // Report progress back to sender (throttle to ~5% steps)
         const last = lastProgressReported.current.get(fileId) ?? -1;
         if (progress >= 100 || progress - last >= 5) {
           lastProgressReported.current.set(fileId, progress);
@@ -1031,11 +1036,16 @@ export const useWebRTC = () => {
       const encoder = new TextEncoder();
       const fileIdBytes = encoder.encode(fileId.padEnd(36, ' '));
 
+      // Pre-allocate reusable send buffer to avoid per-chunk allocation
+      const sendBuf = new Uint8Array(36 + CHUNK_SIZE);
+      sendBuf.set(fileIdBytes, 0);
+      let lastSenderProgress = 0;
+
       const sendChunk = (): Promise<void> => {
         return new Promise((resolve, reject) => {
           const send = () => {
             try {
-              while (offset < buffer.byteLength) {
+              while (offset < totalBytes) {
                 if (ac.signal.aborted) {
                   reject(new Error('Cancelled'));
                   return;
@@ -1049,17 +1059,22 @@ export const useWebRTC = () => {
                   return;
                 }
 
-                const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
-                const chunk = buffer.slice(offset, end);
+                const end = Math.min(offset + CHUNK_SIZE, totalBytes);
+                const chunkLen = end - offset;
 
-                // Prepend fileId to chunk
-                const combined = new Uint8Array(36 + chunk.byteLength);
-                combined.set(fileIdBytes, 0);
-                combined.set(new Uint8Array(chunk), 36);
+                // Reuse pre-allocated buffer: copy chunk data after the 36-byte header
+                sendBuf.set(new Uint8Array(buffer, offset, chunkLen), 36);
+                // Send only the exact slice needed (header + actual chunk length)
+                dc.send(sendBuf.buffer.slice(0, 36 + chunkLen));
 
-                dc.send(combined.buffer);
                 offset = end;
-                // Progress is reported by receiver via file-progress messages (avatar matches actual download)
+
+                // Sender-side progress (throttled to 1% steps)
+                const senderProgress = Math.min(100, Math.round((offset / totalBytes) * 100));
+                if (senderProgress >= 100 || senderProgress - lastSenderProgress >= 1) {
+                  lastSenderProgress = senderProgress;
+                  store.updateFileDownloaderProgress(fileId, targetDeviceId, senderProgress);
+                }
               }
               resolve();
             } catch (err) {
