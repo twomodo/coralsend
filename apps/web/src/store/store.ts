@@ -28,6 +28,8 @@ export interface FileMetadata {
   thumbnailUrl?: string;    // Base64 or blob URL for image preview
   speed?: number;           // Transfer speed in bytes/sec
   eta?: number;             // Estimated seconds remaining
+  trashed?: boolean;        // Hidden from default list (mainly for inbox)
+  trashedAt?: number;
 }
 
 export interface ChatMessage {
@@ -76,6 +78,8 @@ interface AppState {
   
   // Room history (persisted)
   roomHistory: Room[];
+  // Persisted local files per room
+  roomFilesCache: Record<string, FileMetadata[]>;
   
   // File downloaders (fileId -> list of {deviceId, displayName}) - not persisted
   fileDownloaders: Record<string, Array<{ deviceId: string; displayName: string }>>;
@@ -109,6 +113,11 @@ interface AppState {
   updateFileTransferStats: (fileId: string, progress: number, speed: number, eta: number) => void;
   updateFileStatus: (fileId: string, status: FileMetadata['status']) => void;
   removeFile: (fileId: string) => void;
+  removeFiles: (fileIds: string[]) => void;
+  clearFilesByDirection: (direction: FileMetadata['direction']) => void;
+  restoreFiles: (fileIds: string[]) => void;
+  emptyTrashByDirection: (direction: FileMetadata['direction']) => void;
+  purgeFiles: (fileIds: string[]) => void;
   addFileDownloader: (fileId: string, deviceId: string, displayName: string) => void;
   removeFileDownloader: (fileId: string, deviceId: string) => void;
   updateFileDownloaderProgress: (fileId: string, deviceId: string, progress: number) => void;
@@ -150,6 +159,7 @@ const initialState = {
   error: null,
   currentRoom: null,
   roomHistory: [],
+  roomFilesCache: {} as Record<string, FileMetadata[]>,
   fileDownloaders: {} as Record<string, Array<{ deviceId: string; displayName: string }>>,
   fileDownloaderProgress: {} as Record<string, Record<string, number>>,
   debugEnabled: false,
@@ -176,8 +186,10 @@ export const useStore = create<AppState>()(
       // Room - Create
       createRoom: (roomId, deviceId, displayName) => {
         const now = Date.now();
+        const resolvedRoomId = roomId || generateRoomCode();
+        const cachedFiles = get().roomFilesCache[resolvedRoomId] || [];
         const room: Room = {
-          id: roomId || generateRoomCode(),
+          id: resolvedRoomId,
           createdAt: now,
           joinedAt: now,
           members: [{
@@ -187,7 +199,7 @@ export const useStore = create<AppState>()(
             status: 'online',
             isMe: true,
           }],
-          files: [],
+          files: cachedFiles,
           messages: [],
         };
         set({ currentRoom: room, view: 'room', status: 'connected' });
@@ -196,6 +208,7 @@ export const useStore = create<AppState>()(
       // Room - Join
       joinRoom: (roomId, deviceId, displayName) => {
         const now = Date.now();
+        const cachedFiles = get().roomFilesCache[roomId] || [];
         const room: Room = {
           id: roomId,
           createdAt: now,
@@ -207,7 +220,7 @@ export const useStore = create<AppState>()(
             status: 'online',
             isMe: true,
           }],
-          files: [],
+          files: cachedFiles,
           messages: [],
         };
         set({ currentRoom: room, view: 'room', status: 'connecting' });
@@ -301,7 +314,7 @@ export const useStore = create<AppState>()(
 
       // Files - Add
       addFile: (file, providedId) => {
-        const { currentRoom } = get();
+        const { currentRoom, roomFilesCache } = get();
         if (!currentRoom) return '';
         
         const id = providedId || generateId();
@@ -317,12 +330,21 @@ export const useStore = create<AppState>()(
           thumbnailUrl: file.thumbnailUrl,
           progress: file.direction === 'outbox' ? 100 : 0,
           status: 'available',
+          trashed: false,
         };
         
+        const nextFiles = currentRoom.files.some((f) => f.id === id)
+          ? currentRoom.files.map((f) => (f.id === id ? { ...f, ...newFile } : f))
+          : [...currentRoom.files, newFile];
+
         set({
           currentRoom: {
             ...currentRoom,
-            files: [...currentRoom.files, newFile],
+            files: nextFiles,
+          },
+          roomFilesCache: {
+            ...roomFilesCache,
+            [currentRoom.id]: nextFiles,
           },
         });
         
@@ -333,13 +355,13 @@ export const useStore = create<AppState>()(
       updateFileProgress: (fileId, progress) => {
         const { currentRoom } = get();
         if (!currentRoom) return;
-        
+        const nextFiles = currentRoom.files.map(f =>
+          f.id === fileId ? { ...f, progress } : f
+        );
         set({
           currentRoom: {
             ...currentRoom,
-            files: currentRoom.files.map(f =>
-              f.id === fileId ? { ...f, progress } : f
-            ),
+            files: nextFiles,
           },
         });
       },
@@ -348,43 +370,151 @@ export const useStore = create<AppState>()(
       updateFileTransferStats: (fileId, progress, speed, eta) => {
         const { currentRoom } = get();
         if (!currentRoom) return;
+        const nextFiles = currentRoom.files.map(f =>
+          f.id === fileId ? { ...f, progress, speed, eta } : f
+        );
 
         set({
           currentRoom: {
             ...currentRoom,
-            files: currentRoom.files.map(f =>
-              f.id === fileId ? { ...f, progress, speed, eta } : f
-            ),
+            files: nextFiles,
           },
         });
       },
 
       // Files - Update Status
       updateFileStatus: (fileId, status) => {
-        const { currentRoom } = get();
+        const { currentRoom, roomFilesCache } = get();
         if (!currentRoom) return;
-        
+        const nextFiles = currentRoom.files.map(f =>
+          f.id === fileId ? { ...f, status } : f
+        );
         set({
           currentRoom: {
             ...currentRoom,
-            files: currentRoom.files.map(f =>
-              f.id === fileId ? { ...f, status } : f
-            ),
+            files: nextFiles,
           },
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
         });
       },
 
       // Files - Remove
       removeFile: (fileId) => {
-        const { currentRoom, fileDownloaders } = get();
+        const { currentRoom, fileDownloaders, fileDownloaderProgress, roomFilesCache } = get();
         if (!currentRoom) return;
+        const target = currentRoom.files.find((f) => f.id === fileId);
+        if (!target) return;
+        const shouldTrash = target.direction === 'inbox';
         const { [fileId]: _, ...rest } = fileDownloaders;
+        const { [fileId]: __, ...restProgress } = fileDownloaderProgress;
+        const nextFiles = shouldTrash
+          ? currentRoom.files.map((f) =>
+              f.id === fileId ? { ...f, trashed: true, trashedAt: Date.now() } : f
+            )
+          : currentRoom.files.filter((f) => f.id !== fileId);
         set({
           currentRoom: {
             ...currentRoom,
-            files: currentRoom.files.filter(f => f.id !== fileId),
+            files: nextFiles,
           },
           fileDownloaders: rest,
+          fileDownloaderProgress: restProgress,
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
+        });
+      },
+
+      removeFiles: (fileIds) => {
+        const ids = new Set(fileIds);
+        const { currentRoom, fileDownloaders, fileDownloaderProgress, roomFilesCache } = get();
+        if (!currentRoom || ids.size === 0) return;
+        const nextFiles = currentRoom.files
+          .map((f) => {
+            if (!ids.has(f.id)) return f;
+            if (f.direction === 'inbox') return { ...f, trashed: true, trashedAt: Date.now() };
+            return null;
+          })
+          .filter(Boolean) as FileMetadata[];
+        const nextDownloaders = { ...fileDownloaders };
+        const nextProgress = { ...fileDownloaderProgress };
+        ids.forEach((id) => {
+          delete nextDownloaders[id];
+          delete nextProgress[id];
+        });
+        set({
+          currentRoom: { ...currentRoom, files: nextFiles },
+          fileDownloaders: nextDownloaders,
+          fileDownloaderProgress: nextProgress,
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
+        });
+      },
+
+      clearFilesByDirection: (direction) => {
+        const { currentRoom, fileDownloaders, fileDownloaderProgress, roomFilesCache } = get();
+        if (!currentRoom) return;
+        const removedIds = new Set(currentRoom.files.filter((f) => f.direction === direction).map((f) => f.id));
+        if (removedIds.size === 0) return;
+        const nextFiles = currentRoom.files
+          .map((f) => {
+            if (f.direction !== direction) return f;
+            if (direction === 'inbox') return { ...f, trashed: true, trashedAt: Date.now() };
+            return null;
+          })
+          .filter(Boolean) as FileMetadata[];
+        const nextDownloaders = { ...fileDownloaders };
+        const nextProgress = { ...fileDownloaderProgress };
+        removedIds.forEach((id) => {
+          delete nextDownloaders[id];
+          delete nextProgress[id];
+        });
+        set({
+          currentRoom: { ...currentRoom, files: nextFiles },
+          fileDownloaders: nextDownloaders,
+          fileDownloaderProgress: nextProgress,
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
+        });
+      },
+
+      restoreFiles: (fileIds) => {
+        const ids = new Set(fileIds);
+        const { currentRoom, roomFilesCache } = get();
+        if (!currentRoom || ids.size === 0) return;
+        const nextFiles = currentRoom.files.map((f) =>
+          ids.has(f.id) ? { ...f, trashed: false, trashedAt: undefined } : f
+        );
+        set({
+          currentRoom: { ...currentRoom, files: nextFiles },
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
+        });
+      },
+
+      emptyTrashByDirection: (direction) => {
+        const { currentRoom, roomFilesCache } = get();
+        if (!currentRoom) return;
+        const nextFiles = currentRoom.files.filter(
+          (f) => !(f.direction === direction && f.trashed)
+        );
+        set({
+          currentRoom: { ...currentRoom, files: nextFiles },
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
+        });
+      },
+
+      purgeFiles: (fileIds) => {
+        const ids = new Set(fileIds);
+        const { currentRoom, fileDownloaders, fileDownloaderProgress, roomFilesCache } = get();
+        if (!currentRoom || ids.size === 0) return;
+        const nextFiles = currentRoom.files.filter((f) => !ids.has(f.id));
+        const nextDownloaders = { ...fileDownloaders };
+        const nextProgress = { ...fileDownloaderProgress };
+        ids.forEach((id) => {
+          delete nextDownloaders[id];
+          delete nextProgress[id];
+        });
+        set({
+          currentRoom: { ...currentRoom, files: nextFiles },
+          fileDownloaders: nextDownloaders,
+          fileDownloaderProgress: nextProgress,
+          roomFilesCache: { ...roomFilesCache, [currentRoom.id]: nextFiles },
         });
       },
 
@@ -478,13 +608,14 @@ export const useStore = create<AppState>()(
 
       // History - Remove
       removeFromHistory: (roomId) => {
-        const { roomHistory } = get();
-        set({ roomHistory: roomHistory.filter(r => r.id !== roomId) });
+        const { roomHistory, roomFilesCache } = get();
+        const { [roomId]: _, ...restCache } = roomFilesCache;
+        set({ roomHistory: roomHistory.filter(r => r.id !== roomId), roomFilesCache: restCache });
       },
 
       // History - Clear
       clearHistory: () => {
-        set({ roomHistory: [] });
+        set({ roomHistory: [], roomFilesCache: {} });
       },
 
       // Pending share (from PWA share_target)
@@ -496,8 +627,8 @@ export const useStore = create<AppState>()(
 
       // Reset
       reset: () => {
-        const { deviceId, roomHistory } = get();
-        set({ ...initialState, deviceId, roomHistory, pendingShareFiles: [] });
+        const { deviceId, roomHistory, roomFilesCache, debugEnabled } = get();
+        set({ ...initialState, deviceId, roomHistory, roomFilesCache, debugEnabled, pendingShareFiles: [] });
       },
     }),
     {
@@ -505,6 +636,8 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         deviceId: state.deviceId,
         roomHistory: state.roomHistory,
+        roomFilesCache: state.roomFilesCache,
+        debugEnabled: state.debugEnabled,
       }),
     }
   )

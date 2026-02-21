@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/store';
 import { Button } from './Button';
+import { Switch } from './Switch';
 import {
   Settings,
   X,
@@ -168,20 +169,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 <p className="text-xs text-[var(--text-muted)]">New members must be approved</p>
               </div>
             </div>
-            <button
-              onClick={() => setRequireApproval(!requireApproval)}
-              className={cn(
-                'w-12 h-6 rounded-full transition-colors relative',
-                requireApproval ? 'bg-teal-500' : 'bg-[var(--text-muted)]'
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  requireApproval ? 'translate-x-7' : 'translate-x-1'
-                )}
-              />
-            </button>
+            <Switch checked={requireApproval} onChange={setRequireApproval} />
           </div>
 
           {/* Debug Console */}
@@ -193,20 +181,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 <p className="text-xs text-[var(--text-muted)]">Show logs for power users (Ctrl+Shift+D)</p>
               </div>
             </div>
-            <button
-              onClick={() => setDebugEnabled(!debugEnabled)}
-              className={cn(
-                'w-12 h-6 rounded-full transition-colors relative',
-                debugEnabled ? 'bg-teal-500' : 'bg-[var(--text-muted)]'
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  debugEnabled ? 'translate-x-7' : 'translate-x-1'
-                )}
-              />
-            </button>
+            <Switch checked={debugEnabled} onChange={setDebugEnabled} />
           </div>
 
           {/* Security note */}

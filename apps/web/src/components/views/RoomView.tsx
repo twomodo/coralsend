@@ -7,11 +7,14 @@ import { getBaseUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import {
   Button,
+  Logo,
   MemberList,
   MemberAvatarStack,
   FileList,
   BottomSheet,
   PanelCard,
+  Switch,
+  ActionButton,
   ChatMessages,
   ChatInput,
   RoomSettings,
@@ -19,7 +22,6 @@ import {
 import {
   Copy,
   Check,
-  Home,
   FileUp,
   Share2,
   Users,
@@ -29,6 +31,13 @@ import {
   ClipboardPaste,
   MessageSquare,
   ChevronUp,
+  X,
+  Trash2,
+  CheckSquare,
+  RotateCcw,
+  RefreshCw,
+  Shield,
+  Camera,
 } from 'lucide-react';
 
 interface RoomViewProps {
@@ -39,16 +48,36 @@ interface RoomViewProps {
   onSendChat: (message: string) => void;
   onRetryConnection?: (deviceId: string) => void;
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
+  onRequestFileMetaSync?: () => void;
 }
 
-export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDownload, onSendChat, onRetryConnection, onCopyTextFile }: RoomViewProps) {
+export function RoomView({
+  onLeaveRoom,
+  onShareFile,
+  onRequestFile,
+  onCancelDownload,
+  onSendChat,
+  onRetryConnection,
+  onCopyTextFile,
+  onRequestFileMetaSync,
+}: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
+  const removeFile = useStore((s) => s.removeFile);
+  const removeFiles = useStore((s) => s.removeFiles);
+  const clearFilesByDirection = useStore((s) => s.clearFilesByDirection);
+  const restoreFiles = useStore((s) => s.restoreFiles);
+  const emptyTrashByDirection = useStore((s) => s.emptyTrashByDirection);
+  const purgeFiles = useStore((s) => s.purgeFiles);
   const [showMembers, setShowMembers] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [copiedField, setCopiedField] = useState<'link' | 'code' | null>(null);
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
+  const [showTrash, setShowTrash] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
@@ -87,6 +116,14 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [activeTab, processPastedFiles]);
+
+  useEffect(() => {
+    // Keep selection/navigation predictable when switching tabs
+    setShowTrash(false);
+    setEditMode(false);
+    clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Paste button: Async Clipboard API (for mobile / programmatic paste)
   const handlePasteClick = useCallback(async () => {
@@ -142,12 +179,12 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
 
   const canUsePasteButton = typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
 
-  // Copy share link
-  const copyLink = async () => {
+  // Copy helpers for share sheet
+  const copyValue = async (value: string, field: 'link' | 'code') => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1800);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -183,6 +220,52 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
   const unreadCount = showChat ? 0 : roomMessages.filter((m) => !m.isMe).length;
 
   if (!currentRoom) return null;
+  const roomName = currentRoom.name?.trim();
+
+  const activeFiles = roomFiles.filter((f) => {
+    if (f.direction !== activeTab) return false;
+    if (activeTab === 'inbox') return showTrash ? !!f.trashed : !f.trashed;
+    return !f.trashed;
+  });
+
+  const clearSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (fileId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  };
+
+  const handleDeleteSingle = (fileId: string) => {
+    if (activeTab === 'inbox' && showTrash) purgeFiles([fileId]);
+    else removeFile(fileId);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+    if (activeTab === 'inbox' && showTrash) purgeFiles(Array.from(selectedIds));
+    else if (activeTab === 'inbox') removeFiles(Array.from(selectedIds));
+    else purgeFiles(Array.from(selectedIds));
+    clearSelection();
+  };
+
+  const handleRestoreSelected = () => {
+    if (selectedIds.size === 0) return;
+    restoreFiles(Array.from(selectedIds));
+    clearSelection();
+  };
+
+  const handleDeleteAll = () => {
+    if (activeTab === 'inbox' && showTrash) emptyTrashByDirection('inbox');
+    else clearFilesByDirection(activeTab);
+    clearSelection();
+  };
 
   return (
     <div className="h-dvh flex flex-col animate-in fade-in slide-in-from-right duration-300">
@@ -190,8 +273,14 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
       <header className="px-3 py-2.5 border-b border-[var(--border-soft)] glass-strong">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={onLeaveRoom} title="Back to home">
-              <Home className="w-5 h-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onLeaveRoom}
+              title="Back to home"
+              className="h-10 w-10 p-1.5"
+            >
+              <Logo size="sm" showText={false} />
             </Button>
             <div>
               <h1 className="font-semibold text-[var(--text-primary)] text-sm">Room {currentRoom.id}</h1>
@@ -202,18 +291,29 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowMembers(true)}
-              className="rounded-lg hover:opacity-85 transition-opacity"
+              className="h-9 px-2 rounded-xl bg-transparent hover:bg-[var(--surface-glass)] transition-colors"
               aria-label="Show members"
+              title="Members"
             >
               <MemberAvatarStack />
             </button>
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSettings(true)}
+              className="h-9 w-9 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-glass)] hover:bg-[var(--surface-glass-strong)]"
+            >
               <Settings className="w-4 h-4" />
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowShare(true)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowShare(true)}
+              className="h-9 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-glass)] hover:bg-[var(--surface-glass-strong)] px-3"
+            >
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Share</span>
             </Button>
@@ -291,32 +391,112 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
               </span>
             }
             actions={
-              activeTab === 'outbox' && outboxCount > 0 ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 transition-all px-3 py-1.5 rounded-lg shadow-sm"
-                    aria-label="Share a file"
-                    title="Share a file"
-                  >
-                    <FileUp className="w-4 h-4" />
-                    <span>Share File</span>
-                  </button>
-                  {canUsePasteButton && (
-                    <button
-                      type="button"
+              <div className="flex flex-col items-end gap-1.5">
+                {/* Main actions row */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 justify-end">
+                  {activeTab === 'inbox' && (
+                    <ActionButton
+                      icon={<Trash2 className="w-3.5 h-3.5" />}
+                      label={showTrash ? 'Show Inbox' : 'Trash'}
+                      onClick={() => {
+                        setShowTrash((v) => !v);
+                        setEditMode(false);
+                        clearSelection();
+                      }}
+                      variant="default"
+                    />
+                  )}
+
+                  {activeTab === 'inbox' && !showTrash && onRequestFileMetaSync && (
+                    <ActionButton
+                      icon={<RefreshCw className="w-3.5 h-3.5" />}
+                      label="Resync"
+                      onClick={onRequestFileMetaSync}
+                      variant="teal"
+                      title="Request metadata sync from peers"
+                    />
+                  )}
+
+                  {activeTab === 'outbox' && (
+                    <ActionButton
+                      icon={<FileUp className="w-3.5 h-3.5" />}
+                      label="Share File"
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="primary"
+                    />
+                  )}
+
+                  {activeTab === 'outbox' && canUsePasteButton && (
+                    <ActionButton
+                      icon={<ClipboardPaste className="w-3.5 h-3.5" />}
+                      label={isPasting ? 'Pasting…' : 'Paste'}
                       onClick={handlePasteClick}
                       disabled={isPasting}
-                      className="flex items-center gap-1.5 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-teal-400/10 border border-teal-400/25 disabled:opacity-50"
-                      aria-label="Paste from clipboard"
-                      title="Paste from clipboard"
-                    >
-                      <ClipboardPaste className="w-4 h-4" />
-                      <span>{isPasting ? 'Pasting…' : 'Paste'}</span>
-                    </button>
+                      variant="teal"
+                    />
+                  )}
+
+                  {/* Edit switch only when there are visible files */}
+                  {activeFiles.length > 0 && (
+                    <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-soft)] px-2 py-1">
+                      <span className="hidden sm:inline text-xs text-[var(--text-muted)]">Edit</span>
+                      <Switch checked={editMode} onChange={setEditMode} />
+                    </div>
                   )}
                 </div>
-              ) : undefined
+
+                {/* Edit actions row */}
+                {editMode && activeFiles.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 justify-end">
+                    {!selectionMode ? (
+                      <ActionButton
+                        icon={<CheckSquare className="w-3.5 h-3.5" />}
+                        label="Select files"
+                        onClick={() => setSelectionMode(true)}
+                        variant="default"
+                      />
+                    ) : (
+                      <>
+                        {activeTab === 'inbox' && showTrash && (
+                          <ActionButton
+                            icon={<RotateCcw className="w-3.5 h-3.5" />}
+                            label="Restore"
+                            onClick={handleRestoreSelected}
+                            disabled={selectedIds.size === 0}
+                            variant="teal"
+                          />
+                        )}
+                        <ActionButton
+                          icon={<Trash2 className="w-3.5 h-3.5" />}
+                          label="Delete selected"
+                          onClick={handleDeleteSelected}
+                          disabled={selectedIds.size === 0}
+                          variant="danger"
+                        />
+                        <ActionButton
+                          icon={<X className="w-3.5 h-3.5" />}
+                          label="Cancel"
+                          onClick={clearSelection}
+                          variant="default"
+                        />
+                      </>
+                    )}
+
+                    <ActionButton
+                      icon={<Trash2 className="w-3.5 h-3.5" />}
+                      label={
+                        activeTab === 'inbox' && !showTrash
+                          ? 'Move all to trash'
+                          : activeTab === 'inbox'
+                            ? 'Empty trash'
+                            : 'Delete all'
+                      }
+                      onClick={handleDeleteAll}
+                      variant="danger"
+                    />
+                  </div>
+                )}
+              </div>
             }
           >
             {pasteError && <p className="text-xs text-red-400 mb-2">{pasteError}</p>}
@@ -327,6 +507,11 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
               onCopyTextFile={onCopyTextFile}
               onAddFile={activeTab === 'outbox' ? () => fileInputRef.current?.click() : undefined}
               onPaste={activeTab === 'outbox' && canUsePasteButton ? handlePasteClick : undefined}
+              showTrash={showTrash}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onDeleteSingle={handleDeleteSingle}
               hideHeader
               hideFilters
             />
@@ -388,18 +573,62 @@ export function RoomView({ onLeaveRoom, onShareFile, onRequestFile, onCancelDown
         title="Share Room"
         icon={<Share2 className="w-4 h-4 text-[var(--text-muted)]" />}
       >
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="bg-white p-3 rounded-xl">
+        <div className="flex flex-col items-center gap-4">
+          <div className="bg-white p-3 rounded-xl shadow-lg">
             <QRCodeSVG value={shareUrl} size={150} level="H" />
           </div>
-          <div className="flex-1 space-y-3">
-            <div>
-              <p className="text-sm text-[var(--text-muted)] mb-1">Room Code</p>
-              <p className="text-2xl font-mono font-bold text-teal-400">{currentRoom.id}</p>
+
+          <div className="w-full max-w-md glass rounded-xl border border-amber-400/20 bg-amber-500/5 p-3">
+            <div className="flex items-start gap-2">
+              <Camera className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+              <p className="text-xs text-[var(--text-muted)]">
+                Scan this QR code with your camera to join the room instantly.
+              </p>
             </div>
-            <Button variant="secondary" onClick={copyLink} className="w-full sm:w-auto">
-              {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copySuccess ? 'Copied!' : 'Copy Link'}
+            <div className="mt-2 flex items-start gap-2">
+              <Shield className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-100/90">
+                Security tip: this room code works like an access key, share it only with trusted people.
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full max-w-md space-y-3">
+            <div className="glass rounded-xl border border-[var(--border-soft)] p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Room Code</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyValue(currentRoom.id, 'code')}
+                  className="h-7 px-2"
+                >
+                  {copiedField === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span className="text-xs">{copiedField === 'code' ? 'Copied' : 'Copy'}</span>
+                </Button>
+              </div>
+              <div className="flex items-end flex-wrap gap-2">
+                <p className="text-4xl sm:text-[2.75rem] font-mono font-extrabold tracking-[0.18em] text-cyan-300 leading-none">
+                  {currentRoom.id}
+                </p>
+                {roomName && (
+                  <span className="mb-1 rounded-full border border-teal-400/30 bg-teal-500/10 px-2.5 py-1 text-[11px] font-semibold text-teal-300">
+                    {roomName}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                This code is your room key. Anyone with it can join directly.
+              </p>
+            </div>
+
+            <Button
+              variant="secondary"
+              onClick={() => copyValue(shareUrl, 'link')}
+              className="w-full"
+            >
+              {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copiedField === 'link' ? 'Copied!' : 'Copy Link'}
             </Button>
           </div>
         </div>

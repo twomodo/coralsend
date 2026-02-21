@@ -40,6 +40,13 @@ type ChatMessagePayload = {
   timestamp: number;
 };
 
+type FileIdentity = {
+  name: string;
+  size: number;
+  type: string;
+  uploaderId: string;
+};
+
 // ============ Constants ============
 
 const FILE_ID_HEADER = 36;
@@ -102,6 +109,15 @@ function parseCandidateType(candidate: RTCIceCandidate | RTCIceCandidateInit): s
   const candidateValue = candidate.candidate ?? '';
   const match = candidateValue.match(/\btyp\s+([a-zA-Z0-9]+)/);
   return match?.[1] ?? 'unknown';
+}
+
+function sameFileIdentity(a: FileIdentity, b: FileIdentity): boolean {
+  return (
+    a.uploaderId === b.uploaderId &&
+    a.name === b.name &&
+    a.size === b.size &&
+    (a.type || 'application/octet-stream') === (b.type || 'application/octet-stream')
+  );
 }
 
 async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<ConnectionPath> {
@@ -309,6 +325,13 @@ export const useWebRTC = () => {
             logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
+            // Auto-hide downloaded inbox file after a short delay (moves to trash)
+            setTimeout(() => {
+              const f = useStore.getState().currentRoom?.files.find((x) => x.id === fileId);
+              if (f?.direction === 'inbox' && f.status === 'completed') {
+                useStore.getState().removeFile(fileId);
+              }
+            }, 5000);
             incomingChunks.current.delete(fileId);
             earlyChunks.current.delete(fileId);
             lastProgressReported.current.delete(fileId);
@@ -828,6 +851,20 @@ export const useWebRTC = () => {
           // Received file metadata from another member
           const meta = msg.payload as FileMetadataPayload;
           if (meta.uploaderId !== myDeviceId) {
+            // Prevent duplicate inbox entries when the same file is re-shared with a new id.
+            const duplicate = store.currentRoom?.files.find((f) =>
+              f.direction === 'inbox' &&
+              sameFileIdentity(
+                { name: f.name, size: f.size, type: f.type, uploaderId: f.uploaderId },
+                { name: meta.name, size: meta.size, type: meta.type, uploaderId: meta.uploaderId }
+              ) &&
+              f.id !== meta.id
+            );
+            if (duplicate) {
+              logger.debug('Transfer', `Skip duplicate inbox meta for ${meta.name}`, meta.id);
+              break;
+            }
+
             console.log('File available:', meta.name, 'from', meta.uploaderName, meta.thumbnailUrl ? '(with thumbnail)' : '');
             store.addFile({
               name: meta.name,
@@ -843,9 +880,41 @@ export const useWebRTC = () => {
           break;
         }
 
+        case 'file-meta-sync-request': {
+          // Another peer asks us to resend current outbox metadata
+          const myFiles = store.currentRoom?.files.filter(
+            (f) => f.direction === 'outbox' && !f.trashed
+          ) || [];
+          myFiles.forEach((file) => {
+            const meta: FileMetadataPayload = {
+              id: file.id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              uploaderId: store.deviceId!,
+              uploaderName: getShortName(store.deviceId!),
+              uploadedAt: file.uploadedAt,
+              thumbnailUrl: file.thumbnailUrl,
+            };
+            ws.current?.send(JSON.stringify({
+              type: 'file-meta',
+              roomId: store.currentRoom?.id,
+              payload: meta,
+            }));
+          });
+          break;
+        }
+
         case 'file-request': {
           // Someone wants to download a file I shared
           const { fileId, requesterId } = msg.payload as { fileId: string; requesterId: string };
+          const stillShared = store.currentRoom?.files.some(
+            (f) => f.id === fileId && f.direction === 'outbox'
+          );
+          if (!stillShared) {
+            pendingFiles.current.delete(fileId);
+            break;
+          }
           const file = pendingFiles.current.get(fileId);
           if (file) {
             const requester = store.currentRoom?.members.find(m => m.deviceId === requesterId);
@@ -937,23 +1006,37 @@ export const useWebRTC = () => {
     const store = useStore.getState();
     const room = store.currentRoom;
     if (!room || !store.deviceId) return;
+    const myDeviceId = store.deviceId;
 
-    const fileId = Math.random().toString(36).substring(2, 15);
-    const myName = getShortName(store.deviceId);
+    const existingOutbox = room.files.find((f) =>
+      f.direction === 'outbox' &&
+      sameFileIdentity(
+        { name: f.name, size: f.size, type: f.type, uploaderId: f.uploaderId },
+        {
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          uploaderId: myDeviceId,
+        }
+      )
+    );
+
+    const fileId = existingOutbox?.id ?? Math.random().toString(36).substring(2, 15);
+    const myName = getShortName(myDeviceId);
     const uploadedAt = Date.now();
 
-    // Store file for later transfer requests
+    // Store/refresh file source for transfer requests.
     pendingFiles.current.set(fileId, file);
 
     // Generate thumbnail for images
     const thumbnailUrl = await generateThumbnail(file);
 
-    // Add to outbox with the same fileId
+    // Add to outbox with the same fileId (existing id if duplicate).
     store.addFile({
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      uploaderId: store.deviceId,
+      uploaderId: myDeviceId,
       uploaderName: myName,
       uploadedAt,
       direction: 'outbox',
@@ -966,7 +1049,7 @@ export const useWebRTC = () => {
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      uploaderId: store.deviceId,
+      uploaderId: myDeviceId,
       uploaderName: myName,
       uploadedAt,
       thumbnailUrl,
@@ -1023,6 +1106,35 @@ export const useWebRTC = () => {
 
     store.updateFileStatus(file.id, 'downloading');
     store.updateFileProgress(file.id, 0);
+  }, []);
+
+  const requestFileMetaSync = useCallback(() => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+
+    // Full inbox reset before resync:
+    // clear current inbox list (including trash), transient download state, and cached text blobs.
+    const inboxIds = room.files
+      .filter((f) => f.direction === 'inbox')
+      .map((f) => f.id);
+
+    if (inboxIds.length > 0) {
+      store.purgeFiles(inboxIds);
+      inboxIds.forEach((id) => {
+        incomingChunks.current.delete(id);
+        earlyChunks.current.delete(id);
+        requestModes.current.delete(id);
+        receivedFileBlobs.current.delete(id);
+        lastProgressReported.current.delete(id);
+      });
+    }
+
+    ws.current?.send(JSON.stringify({
+      type: 'file-meta-sync-request',
+      roomId: room.id,
+      payload: { requesterId: store.deviceId },
+    }));
   }, []);
 
   // Send file to a specific peer
@@ -1265,6 +1377,7 @@ export const useWebRTC = () => {
     connect,
     shareFile,
     requestFile,
+    requestFileMetaSync,
     cancelFileDownload,
     sendChat,
     cleanup,

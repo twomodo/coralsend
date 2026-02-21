@@ -14,7 +14,17 @@ export default function RoomPage() {
   const roomId = params.id as string;
   const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
   
-  const { shareFile, requestFile, cancelFileDownload, sendChat, cleanup, connect, retryConnection, copyTextFile } = useWebRTC();
+  const {
+    shareFile,
+    requestFile,
+    requestFileMetaSync,
+    cancelFileDownload,
+    sendChat,
+    cleanup,
+    connect,
+    retryConnection,
+    copyTextFile,
+  } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
   const status = useStore((s) => s.status);
   
@@ -99,6 +109,7 @@ export default function RoomPage() {
           onSendChat={sendChat}
           onRetryConnection={retryConnection}
           onCopyTextFile={copyTextFile}
+          onRequestFileMetaSync={requestFileMetaSync}
         />
       </div>
       <DebugPanel />
