@@ -3,12 +3,15 @@ import { persist } from 'zustand/middleware';
 
 // ============ Types ============
 
+export type ConnectionPath = 'direct' | 'relay' | 'unknown';
+
 export interface Member {
   deviceId: string;
   displayName: string;
   joinedAt: number;
   status: 'online' | 'offline' | 'connecting';
   isMe: boolean;
+  connectionPath?: ConnectionPath;
 }
 
 export interface FileMetadata {
@@ -96,6 +99,7 @@ interface AppState {
   addMember: (member: Omit<Member, 'isMe'>) => void;
   removeMember: (deviceId: string) => void;
   updateMemberStatus: (deviceId: string, status: Member['status']) => void;
+  updateMemberConnectionPath: (deviceId: string, connectionPath: ConnectionPath) => void;
   
   // Actions - Files
   addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>, id?: string) => string;
@@ -267,6 +271,21 @@ export const useStore = create<AppState>()(
             ...currentRoom,
             members: currentRoom.members.map(m =>
               m.deviceId === deviceId ? { ...m, status } : m
+            ),
+          },
+        });
+      },
+
+      // Members - Update Connection Path (direct / relay)
+      updateMemberConnectionPath: (deviceId, connectionPath) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+
+        set({
+          currentRoom: {
+            ...currentRoom,
+            members: currentRoom.members.map(m =>
+              m.deviceId === deviceId ? { ...m, connectionPath } : m
             ),
           },
         });

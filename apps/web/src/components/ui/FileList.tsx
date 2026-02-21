@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { cn, formatFileSize, getFileIcon } from '@/lib/utils';
-import { useStore, type FileMetadata } from '@/store/store';
+import { useStore, type FileMetadata, type ConnectionPath } from '@/store/store';
 import { getInitials, getAvatarColor } from '@/lib/deviceId';
 import { Button } from './Button';
 import {
@@ -24,6 +24,8 @@ import {
   FileText,
   Archive,
   File,
+  Wifi,
+  Globe,
 } from 'lucide-react';
 
 // ============ File Type Categories ============
@@ -55,9 +57,20 @@ interface FileItemProps {
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
 }
 
+function ConnectionPathIcon({ path }: { path?: ConnectionPath }) {
+  if (!path || path === 'unknown') return null;
+  if (path === 'direct') {
+    return <Wifi className="w-3 h-3 text-teal-400 flex-shrink-0" aria-label="Direct (LAN)" title="Direct (LAN)" />;
+  }
+  return <Globe className="w-3 h-3 text-amber-400 flex-shrink-0" aria-label="Via internet (relay)" title="Via internet (relay)" />;
+}
+
 function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileItemProps) {
   const fileDownloaders = useStore((s) => s.fileDownloaders[file.id] ?? EMPTY_DOWNLOADERS);
   const downloaderProgress = useStore((s) => s.fileDownloaderProgress[file.id] ?? EMPTY_PROGRESS);
+  const uploaderConnectionPath = useStore((s) =>
+    s.currentRoom?.members.find(m => m.deviceId === file.uploaderId)?.connectionPath
+  );
   const isDownloading = file.status === 'downloading';
   const isCompleted = file.status === 'completed';
   const isError = file.status === 'error';
@@ -107,7 +120,10 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
             {isInbox && (
               <>
                 <span className="hidden sm:inline">•</span>
-                <span className="truncate max-w-[120px] sm:max-w-none">{file.uploaderName}</span>
+                <span className="truncate max-w-[120px] sm:max-w-none flex items-center gap-1">
+                  {file.uploaderName}
+                  <ConnectionPathIcon path={uploaderConnectionPath} />
+                </span>
               </>
             )}
             <span className="hidden sm:inline">•</span>

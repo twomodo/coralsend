@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useStore, type Member, type FileMetadata, type ChatMessage } from '@/store/store';
+import { useStore, type Member, type FileMetadata, type ChatMessage, type ConnectionPath } from '@/store/store';
 import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
@@ -102,9 +102,7 @@ function parseCandidateType(candidate: RTCIceCandidate | RTCIceCandidateInit): s
   return match?.[1] ?? 'unknown';
 }
 
-async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<void> {
-  if (!ICE_DIAGNOSTICS) return;
-
+async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<ConnectionPath> {
   try {
     const stats = await pc.getStats();
     let selectedPair: RTCStats | null = null;
@@ -129,8 +127,8 @@ async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string)
     });
 
     if (!selectedPair) {
-      console.log(`[ICE][${remoteDeviceId}] no selected candidate pair yet`);
-      return;
+      if (ICE_DIAGNOSTICS) console.log(`[ICE][${remoteDeviceId}] no selected candidate pair yet`);
+      return 'unknown';
     }
 
     const pair = selectedPair as RTCStats & {
@@ -149,8 +147,12 @@ async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string)
     console.log(
       `[ICE][${remoteDeviceId}] selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`
     );
+
+    const isRelay = localType === 'relay' || remoteType === 'relay';
+    return isRelay ? 'relay' : 'direct';
   } catch (error) {
     console.warn(`[ICE][${remoteDeviceId}] failed to read selected candidate pair`, error);
+    return 'unknown';
   }
 }
 
@@ -451,7 +453,9 @@ export const useWebRTC = () => {
 
       if (state === 'connected' || state === 'completed') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
-        void logSelectedIcePath(pc, remoteDeviceId);
+        void detectIcePath(pc, remoteDeviceId).then((path) => {
+          useStore.getState().updateMemberConnectionPath(remoteDeviceId, path);
+        });
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         const store = useStore.getState();
         store.updateMemberStatus(remoteDeviceId, 'offline');
