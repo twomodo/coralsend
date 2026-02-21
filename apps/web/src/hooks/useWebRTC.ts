@@ -348,10 +348,14 @@ export const useWebRTC = () => {
         incoming.receivedBytes += chunk.byteLength;
         const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
-        // Throttle UI store updates to 1% steps (avoid 131k updates for large files)
+        // Throttle UI store updates to 1% steps
         const prevProgress = store.currentRoom?.files.find(f => f.id === fileId)?.progress ?? 0;
         if (progress >= 100 || progress - prevProgress >= 1) {
-          store.updateFileProgress(fileId, progress);
+          const elapsed = (Date.now() - incoming.startTime) / 1000;
+          const speed = elapsed > 0 ? incoming.receivedBytes / elapsed : 0;
+          const remaining = incoming.meta.size - incoming.receivedBytes;
+          const eta = speed > 0 ? remaining / speed : 0;
+          store.updateFileTransferStats(fileId, progress, speed, eta);
         }
 
         // Report progress back to sender (throttle to ~5% steps)

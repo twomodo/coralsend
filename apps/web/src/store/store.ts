@@ -26,6 +26,8 @@ export interface FileMetadata {
   progress: number;         // Download progress 0-100
   direction: 'inbox' | 'outbox';
   thumbnailUrl?: string;    // Base64 or blob URL for image preview
+  speed?: number;           // Transfer speed in bytes/sec
+  eta?: number;             // Estimated seconds remaining
 }
 
 export interface ChatMessage {
@@ -104,6 +106,7 @@ interface AppState {
   // Actions - Files
   addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>, id?: string) => string;
   updateFileProgress: (fileId: string, progress: number) => void;
+  updateFileTransferStats: (fileId: string, progress: number, speed: number, eta: number) => void;
   updateFileStatus: (fileId: string, status: FileMetadata['status']) => void;
   removeFile: (fileId: string) => void;
   addFileDownloader: (fileId: string, deviceId: string, displayName: string) => void;
@@ -331,6 +334,21 @@ export const useStore = create<AppState>()(
             ...currentRoom,
             files: currentRoom.files.map(f =>
               f.id === fileId ? { ...f, progress } : f
+            ),
+          },
+        });
+      },
+
+      // Files - Update Progress with Speed and ETA
+      updateFileTransferStats: (fileId, progress, speed, eta) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+
+        set({
+          currentRoom: {
+            ...currentRoom,
+            files: currentRoom.files.map(f =>
+              f.id === fileId ? { ...f, progress, speed, eta } : f
             ),
           },
         });

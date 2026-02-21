@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { cn, formatFileSize, getFileIcon } from '@/lib/utils';
+import { cn, formatFileSize, formatSpeed, formatEta, getFileIcon } from '@/lib/utils';
 import { useStore, type FileMetadata, type ConnectionPath } from '@/store/store';
 import { getInitials, getAvatarColor } from '@/lib/deviceId';
 import { Button } from './Button';
@@ -187,7 +187,15 @@ function FileItem({ file, onDownload, onCancelDownload, onCopyTextFile }: FileIt
                 </div>
               </div>
               <div className="mt-1 flex items-center justify-between text-[10px] sm:text-xs text-[var(--text-muted)]">
-                <span>Downloading</span>
+                <span className="flex items-center gap-1.5">
+                  Downloading
+                  {file.speed != null && file.speed > 0 && (
+                    <span className="text-cyan-500 dark:text-cyan-300">{formatSpeed(file.speed)}</span>
+                  )}
+                  {file.eta != null && file.eta > 0 && (
+                    <span>{formatEta(file.eta)}</span>
+                  )}
+                </span>
                 <span className="font-medium text-cyan-500 dark:text-cyan-300">{progressValue}%</span>
               </div>
             </div>
