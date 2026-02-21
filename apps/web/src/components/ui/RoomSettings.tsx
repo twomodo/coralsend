@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/store';
 import { Button } from './Button';
+import { Switch } from './Switch';
 import {
   Settings,
   X,
@@ -13,6 +14,7 @@ import {
   Shield,
   Copy,
   Check,
+  Terminal,
 } from 'lucide-react';
 
 interface RoomSettingsProps {
@@ -24,6 +26,8 @@ interface RoomSettingsProps {
 export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const setRoomName = useStore((s) => s.setRoomName);
+  const debugEnabled = useStore((s) => s.debugEnabled);
+  const setDebugEnabled = useStore((s) => s.setDebugEnabled);
   
   const [name, setName] = useState(currentRoom?.name || '');
   const [maxMembers, setMaxMembers] = useState(8);
@@ -165,20 +169,19 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 <p className="text-xs text-[var(--text-muted)]">New members must be approved</p>
               </div>
             </div>
-            <button
-              onClick={() => setRequireApproval(!requireApproval)}
-              className={cn(
-                'w-12 h-6 rounded-full transition-colors relative',
-                requireApproval ? 'bg-teal-500' : 'bg-[var(--text-muted)]'
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  requireApproval ? 'translate-x-7' : 'translate-x-1'
-                )}
-              />
-            </button>
+            <Switch checked={requireApproval} onChange={setRequireApproval} />
+          </div>
+
+          {/* Debug Console */}
+          <div className="flex items-center justify-between glass rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--text-primary)]">Debug Console</p>
+                <p className="text-xs text-[var(--text-muted)]">Show logs for power users (Ctrl+Shift+D)</p>
+              </div>
+            </div>
+            <Switch checked={debugEnabled} onChange={setDebugEnabled} />
           </div>
 
           {/* Security note */}
